@@ -1,16 +1,11 @@
-﻿namespace BlackBarLabs.Search.Azure.Tests
+﻿using System;
+
+namespace BlackBarLabs.Search.Azure.Tests
 {
-    //[SerializePropertyNamesAsCamelCase]
-    public class Product
+    public class ProductSuggest
     {
         public string RowKey { get; set; }
 
-        public string Brand { get; set; }
-
-        public string ProductName { get; set; }
-
-        public string Sku { get; set; }
-
-        public string Cost { get; set; }
+        public string Text { get; set; }
     }
 }

@@ -20,7 +20,9 @@ namespace BlackBarLabs.Search.Azure
 
         public delegate void CreateIndexFieldsCallback(CreateFieldCallback createField);
         public delegate void CreateFieldCallback(string fieldName, string fieldType, bool isKey, bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable);
-        public async Task<bool> CreateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, int creationDelay = 0)
+        public delegate void CreateSuggesterCallback(string suggesterName, List<string> fieldNames);
+        public delegate void CreateIndexSuggesterCallback(CreateSuggesterCallback suggesterCallback);
+        public async Task<bool> CreateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
         {
             try
             {
@@ -41,11 +43,24 @@ namespace BlackBarLabs.Search.Azure
                         });
                     });
 
+                var suggester = default(Suggester);
+                createSuggesterCallback.Invoke((name, fieldNames) =>
+                {
+                    suggester = new Suggester
+                    {
+                        Name = name,
+                        SourceFields = fieldNames
+                    };
+                });
+                
                 var definition = new Index()
                 {
                     Name = indexName,
-                    Fields = fields
+                    Fields = fields,
                 };
+                if (default(Suggester) != suggester) 
+                    definition.Suggesters.Add(suggester);
+
                 var response = await searchClient.Indexes.CreateAsync(definition);
                 await Task.Delay(creationDelay);
                 return (response.StatusCode == HttpStatusCode.Created || response.StatusCode == HttpStatusCode.OK);
@@ -56,7 +71,7 @@ namespace BlackBarLabs.Search.Azure
             }
         }
 
-        public bool CreateIndex(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback)
+        public bool CreateIndex(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, CreateIndexSuggesterCallback createSuggesterCallback)
         {
             try
             {
@@ -77,11 +92,24 @@ namespace BlackBarLabs.Search.Azure
                         });
                     });
 
+                var suggester = default(Suggester);
+                createSuggesterCallback.Invoke((name, names) =>
+                {
+                    suggester = new Suggester
+                    {
+                        Name = name,
+                        SourceFields = names
+                    };
+                });
+
                 var definition = new Index()
                 {
                     Name = indexName,
                     Fields = fields
                 };
+                if (default(Suggester) != suggester)
+                    definition.Suggesters.Add(suggester);
+
                 var response = searchClient.Indexes.Create(definition);
                 return (response.StatusCode == HttpStatusCode.Created || response.StatusCode == HttpStatusCode.OK);
             }
@@ -139,8 +167,6 @@ namespace BlackBarLabs.Search.Azure
                 createIndex.Invoke(indexName);
             }
 
-            //TODO - Use async methods on search api   http://alexmang.com/2015/03/azure-search-is-now-generally-available/
-
             var indexClient = searchClient.Indexes.GetClient(indexName);
             if (default(SearchIndexClient) == indexClient)
                 throw new InvalidOperationException("Index does not exist: " + indexName);
@@ -165,21 +191,47 @@ namespace BlackBarLabs.Search.Azure
             }
         }
         
-        public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(string indexName, string searchText, Func<TResult, TResult> convertFunc, string filter = null)
+        public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(string indexName, string searchText, List<string> facetFields, Func<TResult, TResult> convertFunc, 
+            Action<string, Dictionary<string, long>> facetFunc, string filter = null)
             where TResult : class, new()
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
 
             // Execute search based on search text and optional filter 
-            var sp = new SearchParameters();
+            var searchParameters = new SearchParameters();
             if (!string.IsNullOrEmpty(filter))
-            {
-                sp.Filter = filter;
-            }
-            var response = await indexClient.Documents.SearchAsync<TResult>(searchText, sp);
-            //var products = response.Select((result => result.Document));
+                searchParameters.Filter = filter;
+            
+            if (default(List<string>) != facetFields)
+                searchParameters.Facets = facetFields;
+
+            var response = await indexClient.Documents.SearchAsync<TResult>(searchText, searchParameters);
             var products = response.Select(item => convertFunc(item.Document));
+            if (default(List<string>) != facetFields)
+            {
+                foreach (var facet in response.Facets)
+                {
+                    var facetValues = facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count);
+                    facetFunc.Invoke(facet.Key, facetValues);
+                }
+            }
             return products;
+        }
+
+        public async Task<IEnumerable<T>> SuggestAsync<T>(string indexName, string suggestName, string searchText, int top, bool fuzzy, Func<T, T> convertFunc, string filter = null)
+            where T : class, new()
+        {
+            var indexClient = searchClient.Indexes.GetClient(indexName);
+            var suggestParameters = new SuggestParameters()
+            {
+                UseFuzzyMatching = fuzzy,
+                Top = top,
+                Filter = filter
+            };
+
+            var response = await indexClient.Documents.SuggestAsync<T>(searchText, suggestName, suggestParameters);
+            var suggestions = response.Select(item => convertFunc(item.Document));
+            return suggestions;
         }
     }
 }

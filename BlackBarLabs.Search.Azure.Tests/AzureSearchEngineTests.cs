@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Linq;
 
 namespace BlackBarLabs.Search.Azure.Tests
 {
@@ -9,6 +11,8 @@ namespace BlackBarLabs.Search.Azure.Tests
     public class AzureSearchEngineTests
     { 
         private AzureSearchEngine azureSearchEngine;
+        private const string SuggesterName = "sg";
+
         [TestInitialize]
         public void TestInitialize()
         {
@@ -86,8 +90,8 @@ namespace BlackBarLabs.Search.Azure.Tests
                     await CreateIndexInternalAsync(indexName);
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
-                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "Yellow",
-                    product => product);
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "Yellow", null,
+                    product => product, (s, longs) => { });
                 var found = false;
                 foreach (var doc in foundDocs)
                 {
@@ -108,6 +112,142 @@ namespace BlackBarLabs.Search.Azure.Tests
             }
         }
 
+        [TestMethod]
+        public async Task GetFacets()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString();
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                var products = CreateProductList();
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+                await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
+                var facetFields = new List<string>() {"Brand"};
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields,
+                    product => product, (facetKey, facets) =>
+                    {
+                        Assert.IsTrue(facetFields.Contains(facetKey));
+                        Assert.IsTrue(facets.ContainsKey("Coke"));
+                        Assert.IsTrue(facets.ContainsKey("Pepsi"));
+                        Assert.IsTrue(facets.ContainsKey("NeHi"));
+                        Assert.IsTrue(facets["Coke"] == 4);
+                        Assert.IsTrue(facets["Pepsi"] == 3);
+                        Assert.IsTrue(facets["NeHi"] == 1);
+                    });
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
+        }
+
+        [TestMethod]
+        public async Task Filter()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString();
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                var products = CreateProductList();
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+                await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
+                var facetFields = new List<string>() { "Brand" };
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields,
+                    product => product, (facetKey, facets) =>
+                    {
+                        Assert.IsTrue(facetFields.Contains(facetKey));
+                        Assert.IsTrue(facets.ContainsKey("Coke"));
+                        Assert.IsTrue(facets.ContainsKey("Pepsi"));
+                        Assert.IsTrue(facets.ContainsKey("NeHi"));
+                        Assert.IsTrue(facets["Coke"] == 4);
+                        Assert.IsTrue(facets["Pepsi"] == 3);
+                        Assert.IsTrue(facets["NeHi"] == 1);
+                    });
+                var found = false;
+                foreach (var doc in foundDocs)
+                {
+                    if (doc.ProductName.Contains("Yellow"))
+                        found = true;
+                }
+                Assert.IsTrue(found);
+
+                // Apply a filter
+                foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields,
+                    product => product, (facetKey, facets) =>
+                    {
+                        Assert.IsTrue(facetFields.Contains(facetKey));
+                        Assert.IsFalse(facets.ContainsKey("Coke"));
+                        Assert.IsTrue(facets.ContainsKey("Pepsi"));
+                        Assert.IsFalse(facets.ContainsKey("NeHi"));
+                        Assert.IsTrue(facets["Pepsi"] == 3);
+                    }, "Brand eq 'Pepsi'");
+                found = false;
+                foreach (var doc in foundDocs)
+                {
+                    if (doc.ProductName.Contains("Diet Pepsi"))
+                        found = true;
+                }
+                Assert.IsTrue(found);
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
+        }
+
+        [TestMethod]
+        public async Task Suggest()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString();
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                var products = CreateProductList();
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+                await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
+
+                var results = await this.azureSearchEngine.SuggestAsync<ProductSuggest>(distributorId, SuggesterName,
+                    "Coke", 8, true,
+                    suggest => suggest);
+                Assert.AreEqual(2, results.Count());
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
+
+        }
+
         private async Task CreateIndexInternalAsync(string distributorId)
         {
             var result = await azureSearchEngine.CreateIndexAsync(distributorId, field =>
@@ -116,7 +256,12 @@ namespace BlackBarLabs.Search.Azure.Tests
                 {
                     field.Invoke(fieldInfo.Name, fieldInfo.Type, fieldInfo.IsKey, fieldInfo.IsSearchable, fieldInfo.IsFilterable, fieldInfo.IsSortable, fieldInfo.IsFacetable, fieldInfo.IsRetrievable);
                 }
-            }, 5000);
+            },
+            (callback =>
+            {
+                callback.Invoke(SuggesterName, new List<string>() { "RowKey","ProductName" });   
+            }) 
+            ,5000);
             Assert.IsTrue(result);
         }
 
@@ -133,9 +278,120 @@ namespace BlackBarLabs.Search.Azure.Tests
                 new Product() {RowKey = "1", Brand = "Coke", ProductName = "Coke Classic", Sku = "123456", Cost = "100"},
                 new Product() {RowKey = "2", Brand = "Coke", ProductName = "Sprite", Sku = "123457", Cost = "100"},
                 new Product() {RowKey = "3", Brand = "Coke", ProductName = "Diet Coke", Sku = "123458", Cost = "100"},
-                new Product() {RowKey = "4", Brand = "Coke", ProductName = "Mello Yellow", Sku = "123459", Cost = "100"}
+                new Product() {RowKey = "4", Brand = "Coke", ProductName = "Mello Yellow", Sku = "123459", Cost = "100"},
+                new Product() {RowKey = "5", Brand = "Pepsi", ProductName = "Pepsi", Sku = "223450", Cost = "200"},
+                new Product() {RowKey = "6", Brand = "Pepsi", ProductName = "Diet Pepsi", Sku = "223451", Cost = "210"},
+                new Product() {RowKey = "7", Brand = "Pepsi", ProductName = "Pepsi Clear", Sku = "223452", Cost = "200"},
+                new Product() {RowKey = "8", Brand = "NeHi", ProductName = "Grape", Sku = "323450", Cost = "300"}
             };
             return products;
-        } 
+        }
+
+        [TestMethod]
+        public async Task MergeDataInIndex()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString("N");
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                var products = CreateProductList();
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+
+                var updatedProducts = products.Select(product => new Product()
+                {
+                    Brand = "Updated" + product.Brand,
+                    Cost = product.Cost,
+                    ProductName = product.ProductName,
+                    RowKey = product.RowKey,
+                    Sku = product.Sku
+                }).ToList();
+
+                //Add the same again with updates
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, updatedProducts, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+
+
+                await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "UpdatedCoke", null,
+                    product => product, (s, longs) => { });
+                Assert.IsTrue(foundDocs.Any());
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
+        }
+
+        [Ignore]
+        [TestMethod]
+        // This test is just here to toy with batching index updates and compare times.  It should always be ignored.
+        public async Task AddDataToIndexOneAtATime()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString("N");
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                var products = CreateProductListByCount(300);
+
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
+                foreach (var product in products)
+                {
+                    await azureSearchEngine.IndexItemsAsync<Product>(distributorId, new List<Product>() {product}, async indexName =>
+                    {
+                        await CreateIndexInternalAsync(indexName);
+                    });
+                }
+                stopwatch.Stop();
+                Console.WriteLine("One at a time: " + stopwatch.Elapsed);
+
+                await DeleteIndexInternalAsync(distributorId);
+
+                await CreateIndexInternalAsync(distributorId);
+                stopwatch = new Stopwatch();
+                stopwatch.Start();
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+                stopwatch.Stop();
+                Console.WriteLine("Entire list at once: " + stopwatch.Elapsed);
+                
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
+        }
+
+        private static List<Product> CreateProductListByCount(int count)
+        {
+            var products = new List<Product>();
+            for (var i = 0; i < count; i++)
+            {
+                var key = i.ToString();
+                products.Add(new Product() {RowKey = key, Brand = "Coke", ProductName = "Coke Classic", Sku = "123456" + key, Cost = "100"});
+            }
+            return products;
+        }
     }
 }

@@ -98,6 +98,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="ProductSuggest.cs" />
     <Compile Include="Product.cs" />
     <Compile Include="ProductFields.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
