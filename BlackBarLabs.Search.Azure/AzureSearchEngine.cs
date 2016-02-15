@@ -171,7 +171,7 @@ namespace BlackBarLabs.Search.Azure
             if (default(SearchIndexClient) == indexClient)
                 throw new InvalidOperationException("Index does not exist: " + indexName);
 
-            while (true)
+            while (numberOfTimesToRetry >= 0)
             {
                 try
                 {
@@ -185,10 +185,8 @@ namespace BlackBarLabs.Search.Azure
                         throw;
                 }
                 numberOfTimesToRetry--;
-
-                if (numberOfTimesToRetry <= 0)
-                    throw new Exception("Indexing of items has exceeded maximum allowable attempts");
             }
+            throw new Exception("Indexing of items has exceeded maximum allowable attempts");
         }
         
         public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(string indexName, string searchText, List<string> facetFields, Func<TResult, TResult> convertFunc, 
