@@ -90,8 +90,8 @@ namespace BlackBarLabs.Search.Azure.Tests
                     await CreateIndexInternalAsync(indexName);
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
-                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "Yellow", null,
-                    product => product, (s, longs) => { });
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "Yellow", null, false, 50, 0, null,
+                    product => product, (s, longs) => { }, l => { var count = l; });
                 var found = false;
                 foreach (var doc in foundDocs)
                 {
@@ -127,7 +127,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
                 var facetFields = new List<string>() {"Brand"};
-                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields,
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, false, 50, 0, null,
                     product => product, (facetKey, facets) =>
                     {
                         Assert.IsTrue(facetFields.Contains(facetKey));
@@ -137,7 +137,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                         Assert.IsTrue(facets["Coke"] == 4);
                         Assert.IsTrue(facets["Pepsi"] == 3);
                         Assert.IsTrue(facets["NeHi"] == 1);
-                    });
+                    }, l => { var count = l; });
             }
             catch (Exception ex)
             {
@@ -166,7 +166,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
                 var facetFields = new List<string>() { "Brand" };
-                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields,
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, false, 50, 0, null,
                     product => product, (facetKey, facets) =>
                     {
                         Assert.IsTrue(facetFields.Contains(facetKey));
@@ -176,7 +176,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                         Assert.IsTrue(facets["Coke"] == 4);
                         Assert.IsTrue(facets["Pepsi"] == 3);
                         Assert.IsTrue(facets["NeHi"] == 1);
-                    });
+                    }, l => { var count = l; });
                 var found = false;
                 foreach (var doc in foundDocs)
                 {
@@ -186,7 +186,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                 Assert.IsTrue(found);
 
                 // Apply a filter
-                foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields,
+                foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, false, 50, 0, "Brand eq 'Pepsi'",
                     product => product, (facetKey, facets) =>
                     {
                         Assert.IsTrue(facetFields.Contains(facetKey));
@@ -194,7 +194,44 @@ namespace BlackBarLabs.Search.Azure.Tests
                         Assert.IsTrue(facets.ContainsKey("Pepsi"));
                         Assert.IsFalse(facets.ContainsKey("NeHi"));
                         Assert.IsTrue(facets["Pepsi"] == 3);
-                    }, "Brand eq 'Pepsi'");
+                    }, l => { var count = l; });
+                found = false;
+                foreach (var doc in foundDocs)
+                {
+                    if (doc.ProductName.Contains("Diet Pepsi"))
+                        found = true;
+                }
+                Assert.IsTrue(found);
+
+
+                // And a more complicated filter
+                foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, false, 50, 0, "Brand eq 'Pepsi' and Cost ge 200",
+                    product => product, (facetKey, facets) =>
+                    {
+                        Assert.IsTrue(facetFields.Contains(facetKey));
+                        Assert.IsFalse(facets.ContainsKey("Coke"));
+                        Assert.IsTrue(facets.ContainsKey("Pepsi"));
+                        Assert.IsFalse(facets.ContainsKey("NeHi"));
+                        Assert.IsTrue(facets["Pepsi"] == 2);
+                    }, l => { var count = l; });
+                found = false;
+                foreach (var doc in foundDocs)
+                {
+                    if (doc.ProductName.Contains("Diet Pepsi"))
+                        found = true;
+                }
+                Assert.IsTrue(found);
+
+                // And a more complicated filter with top
+                foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, false, 50, 0, "Brand eq 'Pepsi' and Cost ge 200",
+                    product => product, (facetKey, facets) =>
+                    {
+                        Assert.IsTrue(facetFields.Contains(facetKey));
+                        Assert.IsFalse(facets.ContainsKey("Coke"));
+                        Assert.IsTrue(facets.ContainsKey("Pepsi"));
+                        Assert.IsFalse(facets.ContainsKey("NeHi"));
+                        Assert.IsTrue(facets["Pepsi"] == 2);
+                    }, l => { var count = l; });
                 found = false;
                 foreach (var doc in foundDocs)
                 {
@@ -214,6 +251,56 @@ namespace BlackBarLabs.Search.Azure.Tests
                     throw exception;
             }
         }
+
+        [TestMethod]
+        public async Task Paging()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString();
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                var products = CreateProductList();
+                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+                await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
+                var facetFields = new List<string>() { "Brand" };
+
+                long? totalFoundCount = null;
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, true, 5, 0, null,
+                    product => product, (facetKey, facets) =>
+                    {
+                    }, 
+                    (count) => totalFoundCount = count);
+                Assert.AreEqual(8, totalFoundCount);
+                Assert.AreEqual(5, foundDocs.Count());
+
+                // get the rest of the set
+                foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", facetFields, true, 5, 5, null,
+                    product => product, (facetKey, facets) =>
+                    {
+                    },
+                    (count) => totalFoundCount = count);
+                Assert.AreEqual(8, totalFoundCount);
+                Assert.AreEqual(3, foundDocs.Count());
+
+            
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
+        }
+
+
 
         [TestMethod]
         public async Task Suggest()
@@ -275,14 +362,14 @@ namespace BlackBarLabs.Search.Azure.Tests
         {
             var products = new List<Product>
             {
-                new Product() {RowKey = "1", Brand = "Coke", ProductName = "Coke Classic", Sku = "123456", Cost = "100"},
-                new Product() {RowKey = "2", Brand = "Coke", ProductName = "Sprite", Sku = "123457", Cost = "100"},
-                new Product() {RowKey = "3", Brand = "Coke", ProductName = "Diet Coke", Sku = "123458", Cost = "100"},
-                new Product() {RowKey = "4", Brand = "Coke", ProductName = "Mello Yellow", Sku = "123459", Cost = "100"},
-                new Product() {RowKey = "5", Brand = "Pepsi", ProductName = "Pepsi", Sku = "223450", Cost = "200"},
-                new Product() {RowKey = "6", Brand = "Pepsi", ProductName = "Diet Pepsi", Sku = "223451", Cost = "210"},
-                new Product() {RowKey = "7", Brand = "Pepsi", ProductName = "Pepsi Clear", Sku = "223452", Cost = "200"},
-                new Product() {RowKey = "8", Brand = "NeHi", ProductName = "Grape", Sku = "323450", Cost = "300"}
+                new Product() {RowKey = "1", Brand = "Coke", ProductName = "Coke Classic", Sku = "123456", Cost = 100},
+                new Product() {RowKey = "2", Brand = "Coke", ProductName = "Sprite", Sku = "123457", Cost = 100},
+                new Product() {RowKey = "3", Brand = "Coke", ProductName = "Diet Coke", Sku = "123458", Cost = 201},
+                new Product() {RowKey = "4", Brand = "Coke", ProductName = "Mello Yellow", Sku = "123459", Cost = 100},
+                new Product() {RowKey = "5", Brand = "Pepsi", ProductName = "Pepsi", Sku = "223450", Cost = 200},
+                new Product() {RowKey = "6", Brand = "Pepsi", ProductName = "Diet Pepsi", Sku = "223451", Cost = 210},
+                new Product() {RowKey = "7", Brand = "Pepsi", ProductName = "Pepsi Clear", Sku = "223452", Cost = 190},
+                new Product() {RowKey = "8", Brand = "NeHi", ProductName = "Grape", Sku = "323450", Cost = 300}
             };
             return products;
         }
@@ -318,8 +405,8 @@ namespace BlackBarLabs.Search.Azure.Tests
 
 
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
-                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "UpdatedCoke", null,
-                    product => product, (s, longs) => { });
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "UpdatedCoke", null, false, 50, 0, null,
+                    product => product, (s, longs) => { }, l => { var count = l; });
                 Assert.IsTrue(foundDocs.Any());
             }
             catch (Exception ex)
@@ -389,7 +476,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             for (var i = 0; i < count; i++)
             {
                 var key = i.ToString();
-                products.Add(new Product() {RowKey = key, Brand = "Coke", ProductName = "Coke Classic", Sku = "123456" + key, Cost = "100"});
+                products.Add(new Product() {RowKey = key, Brand = "Coke", ProductName = "Coke Classic", Sku = "123456" + key, Cost = 100});
             }
             return products;
         }

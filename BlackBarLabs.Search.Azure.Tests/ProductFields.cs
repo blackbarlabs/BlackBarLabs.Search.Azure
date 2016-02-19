@@ -10,7 +10,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             new SearchFieldInfo { Name = "Brand",         Type = typeof(string).ToString(),     IsKey = false, IsSearchable = true,  IsFilterable = true,  IsSortable = true,  IsFacetable = true,  IsRetrievable = true},
             new SearchFieldInfo { Name = "ProductName",   Type = typeof(string).ToString(),     IsKey = false, IsSearchable = true,  IsFilterable = true,  IsSortable = true,  IsFacetable = false, IsRetrievable = true},
             new SearchFieldInfo { Name = "Sku",           Type = typeof(string).ToString(),     IsKey = false, IsSearchable = true,  IsFilterable = true,  IsSortable = true,  IsFacetable = false, IsRetrievable = true},
-            new SearchFieldInfo { Name = "Cost",          Type = typeof(decimal).ToString(),    IsKey = false, IsSearchable = false, IsFilterable = true,  IsSortable = true,  IsFacetable = true,  IsRetrievable = true}
+            new SearchFieldInfo { Name = "Cost",          Type = typeof(double).ToString(),    IsKey = false, IsSearchable = false, IsFilterable = true,  IsSortable = true,  IsFacetable = true,  IsRetrievable = true}
         };                                                     
     }
 }

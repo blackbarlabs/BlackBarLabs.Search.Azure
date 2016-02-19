@@ -11,6 +11,6 @@
 
         public string Sku { get; set; }
 
-        public string Cost { get; set; }
+        public decimal Cost { get; set; }
     }
 }

@@ -126,8 +126,10 @@ namespace BlackBarLabs.Search.Azure
             {
                 case "System.String":
                     return "Edm.String";
-                case "System.Decimal":
-                    return "Edm.String";
+                case "System.Double":
+                    return "Edm.Double";
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
             return "";
         }
@@ -191,8 +193,12 @@ namespace BlackBarLabs.Search.Azure
             }
         }
         
-        public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(string indexName, string searchText, List<string> facetFields, Func<TResult, TResult> convertFunc, 
-            Action<string, Dictionary<string, long>> facetFunc, string filter = null)
+        public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(
+            string indexName, string searchText, 
+            List<string> facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
+            Func<TResult, TResult> convertFunc, 
+            Action<string, Dictionary<string, long>> facetFunc, 
+            Action<long?> count)
             where TResult : class, new()
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
@@ -205,6 +211,15 @@ namespace BlackBarLabs.Search.Azure
             if (default(List<string>) != facetFields)
                 searchParameters.Facets = facetFields;
 
+            if (null != includeTotalResultCount)
+                searchParameters.IncludeTotalResultCount = (bool)includeTotalResultCount;
+
+            if (null != top)
+                searchParameters.Top = top;
+
+            if (null != skip)
+                searchParameters.Skip = skip;
+
             var response = await indexClient.Documents.SearchAsync<TResult>(searchText, searchParameters);
             var products = response.Select(item => convertFunc(item.Document));
             if (default(List<string>) != facetFields)
@@ -215,6 +230,7 @@ namespace BlackBarLabs.Search.Azure
                     facetFunc.Invoke(facet.Key, facetValues);
                 }
             }
+            count.Invoke(response.Count);
             return products;
         }
 
