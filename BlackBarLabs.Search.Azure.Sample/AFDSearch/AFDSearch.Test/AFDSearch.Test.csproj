@@ -56,13 +56,13 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure.csproj">
+      <Project>{5db6fe6e-7095-4847-aa86-ab77d5192392}</Project>
+      <Name>BlackBarLabs.Search.Azure</Name>
+    </ProjectReference>
     <ProjectReference Include="..\AFDSearch\AFDSearch.csproj">
       <Project>{31a731b9-ad02-493f-b2a9-b8f8c4507002}</Project>
       <Name>AFDSearch</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure.csproj">
-      <Project>{5db6fe6e-7095-4847-aa86-ab77d5192392}</Project>
-      <Name>BlackBarLabs.Search.Azure</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

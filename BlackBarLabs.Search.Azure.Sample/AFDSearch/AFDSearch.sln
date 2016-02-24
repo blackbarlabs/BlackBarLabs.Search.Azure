@@ -7,9 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AFDSearch", "AFDSearch\AFDS
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AFDSearch.Test", "AFDSearch.Test\AFDSearch.Test.csproj", "{1638C8A3-2240-4B51-ABBF-2E0CA85DDAEF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlackBarLabs.Search.Azure", "BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure.csproj", "{5DB6FE6E-7095-4847-AA86-AB77D5192392}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlackBarLabs.Search.Azure.Tests", "BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure.Tests\BlackBarLabs.Search.Azure.Tests.csproj", "{DA863119-AC77-485C-B876-691E3D0FFCCC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlackBarLabs.Search.Azure", "..\..\BlackBarLabs.Search.Azure\BlackBarLabs.Search.Azure.csproj", "{5DB6FE6E-7095-4847-AA86-AB77D5192392}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,10 +27,6 @@ Global
 		{5DB6FE6E-7095-4847-AA86-AB77D5192392}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5DB6FE6E-7095-4847-AA86-AB77D5192392}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5DB6FE6E-7095-4847-AA86-AB77D5192392}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DA863119-AC77-485C-B876-691E3D0FFCCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DA863119-AC77-485C-B876-691E3D0FFCCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DA863119-AC77-485C-B876-691E3D0FFCCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DA863119-AC77-485C-B876-691E3D0FFCCC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
