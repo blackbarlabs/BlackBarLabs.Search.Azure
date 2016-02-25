@@ -219,7 +219,7 @@ namespace BlackBarLabs.Search.Azure
                 searchParameters.Skip = skip;
 
             var response = await indexClient.Documents.SearchAsync<TResult>(searchText, searchParameters);
-            var products = response.Select(item => convertFunc(item.Document));
+            var items = response.Select(item => convertFunc(item.Document));
             if (default(List<string>) != facetFields)
             {
                 foreach (var facet in response.Facets)
@@ -229,7 +229,7 @@ namespace BlackBarLabs.Search.Azure
                 }
             }
             count.Invoke(response.Count);
-            return products;
+            return items;
         }
 
         public async Task<IEnumerable<T>> SuggestAsync<T>(string indexName, string suggestName, string searchText, int top, bool fuzzy, Func<T, T> convertFunc, string filter = null)
