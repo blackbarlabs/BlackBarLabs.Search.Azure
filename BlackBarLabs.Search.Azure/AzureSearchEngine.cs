@@ -128,6 +128,8 @@ namespace BlackBarLabs.Search.Azure
                     return "Edm.String";
                 case "System.Double":
                     return "Edm.Double";
+                case "System.Decimal":
+                    return "Edm.String";
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -160,7 +162,7 @@ namespace BlackBarLabs.Search.Azure
             return true;
         }
 
-        public async Task<bool> IndexItemsAsync<T>(string indexName, List<T> itemList, Action<string> createIndex, int numberOfTimesToRetry = 200)
+        public async Task<bool> IndexItemsAsync<T>(string indexName, List<T> itemList, Action<string> createIndex, int numberOfTimesToRetry = 3)
             where T : class
         {
 
