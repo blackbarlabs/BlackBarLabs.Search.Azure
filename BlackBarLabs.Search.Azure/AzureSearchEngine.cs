@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -192,7 +193,18 @@ namespace BlackBarLabs.Search.Azure
             }
             throw new Exception("Indexing of items has exceeded maximum allowable attempts");
         }
-        
+
+        public async Task<TResult> GetDocumentById<TResult>(string indexName, Guid id, Func<TResult, TResult> convertFunc)
+            where TResult : class, new()
+        {
+            var indexClient = searchClient.Indexes.GetClient(indexName);
+            var response = await indexClient.Documents.GetAsync<TResult>(id.ToString("N"));
+            var doc = convertFunc(response.Document);
+            if (null == doc)
+                throw new Exception("Document not found");
+            return doc;
+        }
+
         public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(
             string indexName, string searchText, 
             List<string> facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
