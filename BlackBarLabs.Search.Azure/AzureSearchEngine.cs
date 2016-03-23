@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -12,7 +11,7 @@ namespace BlackBarLabs.Search.Azure
 {
     public class AzureSearchEngine
     {
-        private SearchServiceClient searchClient;
+        private readonly SearchServiceClient searchClient;
 
         public AzureSearchEngine(SearchServiceClient searchClient)
         {
@@ -53,13 +52,13 @@ namespace BlackBarLabs.Search.Azure
                         SourceFields = fieldNames
                     };
                 });
-                
+
                 var definition = new Index()
                 {
                     Name = indexName,
                     Fields = fields,
                 };
-                if (default(Suggester) != suggester) 
+                if (default(Suggester) != suggester)
                     definition.Suggesters.Add(suggester);
 
                 var response = await searchClient.Indexes.CreateAsync(definition);
@@ -163,11 +162,10 @@ namespace BlackBarLabs.Search.Azure
             return true;
         }
 
-        public async Task<bool> IndexItemsAsync<T>(string indexName, List<T> itemList, Action<string> createIndex, int numberOfTimesToRetry = 3)
+        public async Task<bool> MergeOrUploadItemsAsync<T>(string indexName, List<T> itemList, Action<string> createIndex, int numberOfTimesToRetry = 3)
             where T : class
         {
-
-            if (! searchClient.Indexes.Exists(indexName))
+            if (!searchClient.Indexes.Exists(indexName))
             {
                 createIndex.Invoke(indexName);
             }
@@ -180,13 +178,17 @@ namespace BlackBarLabs.Search.Azure
             {
                 try
                 {
-                    var response =
-                        await indexClient.Documents.IndexAsync(IndexBatch.Create(itemList.Select(IndexAction.Create)));
-                    return (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Created);
+                    foreach (var item in itemList)
+                    {
+                        await
+                            indexClient.Documents.IndexAsync(
+                                IndexBatch.Create(IndexAction.Create(IndexActionType.MergeOrUpload, item)));
+                    }
+                    return true;
                 }
                 catch (Exception ex)
                 {
-                    if((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
+                    if ((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
                         throw;
                 }
                 numberOfTimesToRetry--;
@@ -194,11 +196,11 @@ namespace BlackBarLabs.Search.Azure
             throw new Exception("Indexing of items has exceeded maximum allowable attempts");
         }
 
-        public async Task<TResult> GetDocumentById<TResult>(string indexName, Guid id, Func<TResult, TResult> convertFunc)
+        public async Task<TResult> GetDocumentById<TResult>(string indexName, string id, Func<TResult, TResult> convertFunc)
             where TResult : class, new()
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
-            var response = await indexClient.Documents.GetAsync<TResult>(id.ToString("N"));
+            var response = await indexClient.Documents.GetAsync<TResult>(id);
             var doc = convertFunc(response.Document);
             if (null == doc)
                 throw new Exception("Document not found");
@@ -206,10 +208,10 @@ namespace BlackBarLabs.Search.Azure
         }
 
         public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(
-            string indexName, string searchText, 
+            string indexName, string searchText,
             List<string> facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
-            Func<TResult, TResult> convertFunc, 
-            Action<string, Dictionary<string, long>> facetFunc, 
+            Func<TResult, TResult> convertFunc,
+            Action<string, Dictionary<string, long>> facetFunc,
             Action<long?> count)
             where TResult : class, new()
         {
@@ -219,7 +221,7 @@ namespace BlackBarLabs.Search.Azure
             var searchParameters = new SearchParameters();
             if (!string.IsNullOrEmpty(filter))
                 searchParameters.Filter = filter;
-            
+
             if (default(List<string>) != facetFields)
                 searchParameters.Facets = facetFields;
 
@@ -260,6 +262,30 @@ namespace BlackBarLabs.Search.Azure
             var response = await indexClient.Documents.SuggestAsync<T>(searchText, suggestName, suggestParameters);
             var suggestions = response.Select(item => convertFunc(item.Document));
             return suggestions;
+        }
+
+        public async Task<bool> UpdateItemAtomicAsync<T>(string indexName, T item, int numberOfTimesToRetry = 10)
+            where T : class
+        {
+            var indexClient = searchClient.Indexes.GetClient(indexName);
+            if (default(SearchIndexClient) == indexClient)
+                throw new InvalidOperationException("Index does not exist: " + indexName);
+
+            while (numberOfTimesToRetry >= 0)
+            {
+                try
+                {
+                    var itemList = new List<T>() { item };
+                    return await MergeOrUploadItemsAsync(indexName, itemList, null);
+                }
+                catch (Exception ex)
+                {
+                    if ((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
+                        throw;
+                }
+                numberOfTimesToRetry--;
+            }
+            throw new Exception("Indexing of items has exceeded maximum allowable attempts");
         }
     }
 }
