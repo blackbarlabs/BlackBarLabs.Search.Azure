@@ -178,12 +178,10 @@ namespace BlackBarLabs.Search.Azure
             {
                 try
                 {
-                    foreach (var item in itemList)
-                    {
-                        await
-                            indexClient.Documents.IndexAsync(
-                                IndexBatch.Create(IndexAction.Create(IndexActionType.MergeOrUpload, item)));
-                    }
+                    var actions =
+                        itemList.Select(item => IndexAction.Create(IndexActionType.MergeOrUpload, item));
+                    var batch = IndexBatch.Create(actions);
+                    await indexClient.Documents.IndexAsync(batch);
                     return true;
                 }
                 catch (Exception ex)
@@ -200,11 +198,44 @@ namespace BlackBarLabs.Search.Azure
             where TResult : class, new()
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
-            var response = await indexClient.Documents.GetAsync<TResult>(id);
-            var doc = convertFunc(response.Document);
-            if (null == doc)
-                throw new Exception("Document not found");
-            return doc;
+
+            try
+            {
+                var response = await indexClient.Documents.GetAsync<TResult>(id);
+                var doc = convertFunc(response.Document);
+                return doc;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        public async Task<bool> DeleteItemsAsync<T>(string indexName, List<T> itemList, int numberOfTimesToRetry = 3)
+            where T : class
+        {
+            var indexClient = searchClient.Indexes.GetClient(indexName);
+            if (default(SearchIndexClient) == indexClient)
+                throw new InvalidOperationException("Index does not exist: " + indexName);
+
+            while (numberOfTimesToRetry >= 0)
+            {
+                try
+                {
+                    var actions =
+                        itemList.Select(item => IndexAction.Create(IndexActionType.Delete, item));
+                    var batch = IndexBatch.Create(actions);
+                    await indexClient.Documents.IndexAsync(batch);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    if ((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
+                        throw;
+                }
+                numberOfTimesToRetry--;
+            }
+            throw new Exception("Deletion of items has exceeded maximum allowable attempts");
         }
 
         public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(
