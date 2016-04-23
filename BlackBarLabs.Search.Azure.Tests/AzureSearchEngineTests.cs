@@ -59,7 +59,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -85,7 +85,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -121,7 +121,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -160,7 +160,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -261,7 +261,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -311,7 +311,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -374,6 +374,23 @@ namespace BlackBarLabs.Search.Azure.Tests
             return products;
         }
 
+        private static List<Product> CreateLargeProductList(int numberOfItems)
+        {
+            var products = new List<Product>();
+            for(var i =0; i < numberOfItems; i++)
+            {
+                products.Add(new Product()
+                {
+                    RowKey = i.ToString(),
+                    Brand = Guid.NewGuid().ToString(),
+                    ProductName = Guid.NewGuid().ToString(),
+                    Sku = Guid.NewGuid().ToString(),
+                    Cost = 100
+                });
+            };
+            return products;
+        }
+
         [TestMethod]
         public async Task MergeDataInIndex()
         {
@@ -383,7 +400,7 @@ namespace BlackBarLabs.Search.Azure.Tests
             {
                 await CreateIndexInternalAsync(distributorId);
                 var products = CreateProductList();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -398,7 +415,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                 }).ToList();
 
                 //Add the same again with updates
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, updatedProducts, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, updatedProducts, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -437,7 +454,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                 stopwatch.Start();
                 foreach (var product in products)
                 {
-                    await azureSearchEngine.IndexItemsAsync<Product>(distributorId, new List<Product>() {product}, async indexName =>
+                    await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, new List<Product>() {product}, async indexName =>
                     {
                         await CreateIndexInternalAsync(indexName);
                     });
@@ -450,7 +467,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                 await CreateIndexInternalAsync(distributorId);
                 stopwatch = new Stopwatch();
                 stopwatch.Start();
-                await azureSearchEngine.IndexItemsAsync<Product>(distributorId, products, async indexName =>
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
                 {
                     await CreateIndexInternalAsync(indexName);
                 });
@@ -479,6 +496,39 @@ namespace BlackBarLabs.Search.Azure.Tests
                 products.Add(new Product() {RowKey = key, Brand = "Coke", ProductName = "Coke Classic", Sku = "123456" + key, Cost = 100});
             }
             return products;
+        }
+
+        [TestMethod]
+        public async Task SearchWithContinuation()
+        {
+            var exception = default(Exception);
+            var distributorId = Guid.NewGuid().ToString();
+            try
+            {
+                await CreateIndexInternalAsync(distributorId);
+                const int expectedCount = 220;
+                var products = CreateLargeProductList(expectedCount);
+                await azureSearchEngine.MergeOrUploadItemsAsync<Product>(distributorId, products, async indexName =>
+                {
+                    await CreateIndexInternalAsync(indexName);
+                });
+                long? theCount = 0;
+                await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
+                var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(distributorId, "*", null, true, null, null, null,
+                    product => product, (s, longs) => { }, l => { theCount = l; });
+                Assert.AreEqual(expectedCount, theCount);
+                Assert.AreEqual(expectedCount, foundDocs.Count());
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+            finally
+            {
+                await DeleteIndexInternalAsync(distributorId);
+                if (default(Exception) != exception)
+                    throw exception;
+            }
         }
     }
 }

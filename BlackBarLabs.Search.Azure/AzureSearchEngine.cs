@@ -265,6 +265,13 @@ namespace BlackBarLabs.Search.Azure
             if (null != skip)
                 searchParameters.Skip = skip;
 
+            return await DoSearch(indexClient, searchText, facetFields, searchParameters, convertFunc, facetFunc, count.Invoke);
+        }
+
+        private async Task<IEnumerable<TResult>> DoSearch<TResult>(SearchIndexClient indexClient, string searchText, List<string> facetFields, 
+            SearchParameters searchParameters, Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long>> facetFunc, Action<long?> count)
+             where TResult : class, new()
+        {
             var response = await indexClient.Documents.SearchAsync<TResult>(searchText, searchParameters);
             var items = response.Select(item => convertFunc(item.Document));
             if (default(List<string>) != facetFields)
@@ -276,8 +283,39 @@ namespace BlackBarLabs.Search.Azure
                 }
             }
             count.Invoke(response.Count);
-            return items;
+
+            var continuationItems = new List<TResult>() as IEnumerable<TResult>;
+            if (null != response.ContinuationToken)
+            {
+                continuationItems = await DoSearch(indexClient, response.ContinuationToken, facetFields, convertFunc, facetFunc, count.Invoke);
+            }
+            return items.Concat(continuationItems);
         }
+
+        private async Task<IEnumerable<TResult>> DoSearch<TResult>(SearchIndexClient indexClient, SearchContinuationToken continuationToken, List<string> facetFields,
+            Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long>> facetFunc, Action<long?> count)
+             where TResult : class, new()
+        {
+            var response = await indexClient.Documents.ContinueSearchAsync<TResult>(continuationToken);
+            var items = response.Select(item => convertFunc(item.Document));
+            if (default(List<string>) != facetFields)
+            {
+                foreach (var facet in response.Facets)
+                {
+                    var facetValues = facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count);
+                    facetFunc.Invoke(facet.Key, facetValues);
+                }
+            }
+            count.Invoke(response.Count);
+
+            var continuationItems = new List<TResult>() as IEnumerable<TResult>;
+            if (null != response.ContinuationToken)
+            {
+                continuationItems = await DoSearch(indexClient, response.ContinuationToken, facetFields, convertFunc, facetFunc, count.Invoke);
+            }
+            return items.Concat(continuationItems);
+        }
+
 
         public async Task<IEnumerable<T>> SuggestAsync<T>(string indexName, string suggestName, string searchText, int top, bool fuzzy, Func<T, T> convertFunc, string filter = null)
             where T : class, new()
