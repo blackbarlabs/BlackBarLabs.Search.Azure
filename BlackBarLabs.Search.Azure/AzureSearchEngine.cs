@@ -178,8 +178,9 @@ namespace BlackBarLabs.Search.Azure
             {
                 try
                 {
+                    var x = new object();
                     var actions =
-                        itemList.Select(item => IndexAction.Create(IndexActionType.MergeOrUpload, item));
+                        itemList.Select(item => IndexAction.Create(IndexActionType.MergeOrUpload, x));
                     var batch = IndexBatch.Create(actions);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
