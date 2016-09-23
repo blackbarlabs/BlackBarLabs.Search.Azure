@@ -19,7 +19,7 @@ namespace BlackBarLabs.Search.Azure
         }
 
         public delegate void CreateIndexFieldsCallback(CreateFieldCallback createField);
-        public delegate void CreateFieldCallback(string fieldName, string fieldType, bool isKey, 
+        public delegate void CreateFieldCallback(string fieldName, Type fieldType, bool isKey, 
             bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable);
         public delegate void CreateSuggesterCallback(string suggesterName, List<string> fieldNames);
         public delegate void CreateIndexSuggesterCallback(CreateSuggesterCallback suggesterCallback);
@@ -128,10 +128,10 @@ namespace BlackBarLabs.Search.Azure
             }
         }
 
-        private static string GetEdmType(string type)
+        private static string GetEdmType(Type type)
         {
             // Types of search fields must be in Entity Data Format.  https://msdn.microsoft.com/en-us/library/azure/dn946880.aspx
-            switch (type)
+            switch (type.FullName)
             {
                 case "System.String":
                     return "Edm.String";

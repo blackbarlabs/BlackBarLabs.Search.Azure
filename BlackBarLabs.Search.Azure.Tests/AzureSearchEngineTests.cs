@@ -422,8 +422,8 @@ namespace BlackBarLabs.Search.Azure.Tests
                 {
                     field.Invoke(fieldInfo.Name, fieldInfo.Type, fieldInfo.IsKey, fieldInfo.IsSearchable, fieldInfo.IsFilterable, fieldInfo.IsSortable, fieldInfo.IsFacetable, fieldInfo.IsRetrievable);
                 }
-                field.Invoke("AddedField1", typeof(string).ToString(), false, false, false, false, false, false);
-                field.Invoke("AddedField2", typeof(string).ToString(), false, false, false, false, false, false);
+                field.Invoke("AddedField1", typeof(string), false, false, false, false, false, false);
+                field.Invoke("AddedField2", typeof(string), false, false, false, false, false, false);
             },
             (callback =>
             {
