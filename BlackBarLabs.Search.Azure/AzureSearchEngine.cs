@@ -19,10 +19,19 @@ namespace BlackBarLabs.Search.Azure
         }
 
         public delegate void CreateIndexFieldsCallback(CreateFieldCallback createField);
-        public delegate void CreateFieldCallback(string fieldName, string fieldType, bool isKey, bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable);
+        public delegate void CreateFieldCallback(string fieldName, string fieldType, bool isKey, 
+            bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable);
         public delegate void CreateSuggesterCallback(string suggesterName, List<string> fieldNames);
         public delegate void CreateIndexSuggesterCallback(CreateSuggesterCallback suggesterCallback);
-        public async Task<bool> CreateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
+
+        public async Task<bool> CreateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, 
+            CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
+        {
+            return await CreateOrUpdateIndexAsync(indexName, createIndexFieldsCallback, createSuggesterCallback, creationDelay);
+        }
+
+        public async Task<bool> CreateOrUpdateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, 
+            CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
         {
             try
             {
@@ -61,7 +70,7 @@ namespace BlackBarLabs.Search.Azure
                 if (default(Suggester) != suggester)
                     definition.Suggesters.Add(suggester);
 
-                var response = await searchClient.Indexes.CreateAsync(definition);
+                var response = await searchClient.Indexes.CreateOrUpdateAsync(definition);
                 await Task.Delay(creationDelay);
                 return (response.StatusCode == HttpStatusCode.Created || response.StatusCode == HttpStatusCode.OK);
             }

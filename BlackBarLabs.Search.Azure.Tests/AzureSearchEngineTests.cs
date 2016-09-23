@@ -29,6 +29,17 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        public async Task AddFieldsToExistingIndex()
+        {
+            var indexName = Guid.NewGuid().ToString();
+            await CreateIndexInternalAsync(indexName);
+            await AddFieldsToExsistingIndexInternalAsync(indexName);
+            await azureSearchEngine.MergeOrUploadItemsAsync(indexName, CreateProductListWithAddedFields(),
+                    s => { Assert.Fail("Index should already be created"); });
+            await DeleteIndexInternalAsync(indexName);
+        }
+
+        [TestMethod]
         public async Task DeleteIndex()
         {
             var exception = default(Exception);
@@ -403,6 +414,27 @@ namespace BlackBarLabs.Search.Azure.Tests
             Assert.IsTrue(result);
         }
 
+        private async Task AddFieldsToExsistingIndexInternalAsync(string indexName)
+        {
+            var result = await azureSearchEngine.CreateIndexAsync(indexName, field =>
+            {
+                foreach (var fieldInfo in ProductFieldInfo.SearchFields)
+                {
+                    field.Invoke(fieldInfo.Name, fieldInfo.Type, fieldInfo.IsKey, fieldInfo.IsSearchable, fieldInfo.IsFilterable, fieldInfo.IsSortable, fieldInfo.IsFacetable, fieldInfo.IsRetrievable);
+                }
+                field.Invoke("AddedField1", typeof(string).ToString(), false, false, false, false, false, false);
+                field.Invoke("AddedField2", typeof(string).ToString(), false, false, false, false, false, false);
+            },
+            (callback =>
+            {
+                callback.Invoke(SuggesterName, new List<string>() { "RowKey", "ProductName" });
+                callback.Invoke(SuggesterName + "Added", new List<string>() { "AddedField1", "AddedField2" });
+            })
+            , 5000);
+            Assert.IsTrue(result);
+        }
+        
+
         private async Task DeleteIndexInternalAsync(string indexName)
         {
             var result = await azureSearchEngine.DeleteIndexAsync(indexName);
@@ -421,6 +453,16 @@ namespace BlackBarLabs.Search.Azure.Tests
                 new Product() {RowKey = "6", Brand = "Pepsi", ProductName = "Diet Pepsi", Sku = "223451", Cost = 210},
                 new Product() {RowKey = "7", Brand = "Pepsi", ProductName = "Pepsi Clear", Sku = "223452", Cost = 190},
                 new Product() {RowKey = "8", Brand = "NeHi", ProductName = "Grape", Sku = "323450", Cost = 300}
+            };
+            return products;
+        }
+
+        private static List<ProductWithAddedFields> CreateProductListWithAddedFields()
+        {
+            var products = new List<ProductWithAddedFields>
+            {
+                new ProductWithAddedFields() {RowKey = "1", Brand = "Coke", ProductName = "Coke Classic", Sku = "123456", Cost = 100, AddedField1 = "added1", AddedField2 = "added2"},
+                new ProductWithAddedFields() {RowKey = "2", Brand = "Coke", ProductName = "Sprite", Sku = "123457", Cost = 100, AddedField1 = "added1", AddedField2 = "added2"},
             };
             return products;
         }
