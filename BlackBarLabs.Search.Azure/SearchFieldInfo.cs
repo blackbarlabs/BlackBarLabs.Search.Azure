@@ -1,4 +1,6 @@
 ﻿
+using System;
+
 namespace BlackBarLabs.Search.Azure
 {
     public class SearchFieldInfo

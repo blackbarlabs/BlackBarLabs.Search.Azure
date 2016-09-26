@@ -19,10 +19,19 @@ namespace BlackBarLabs.Search.Azure
         }
 
         public delegate void CreateIndexFieldsCallback(CreateFieldCallback createField);
-        public delegate void CreateFieldCallback(string fieldName, string fieldType, bool isKey, bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable);
+        public delegate void CreateFieldCallback(string fieldName, Type fieldType, bool isKey, 
+            bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable);
         public delegate void CreateSuggesterCallback(string suggesterName, List<string> fieldNames);
         public delegate void CreateIndexSuggesterCallback(CreateSuggesterCallback suggesterCallback);
-        public async Task<bool> CreateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
+
+        public async Task<bool> CreateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, 
+            CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
+        {
+            return await CreateOrUpdateIndexAsync(indexName, createIndexFieldsCallback, createSuggesterCallback, creationDelay);
+        }
+
+        public async Task<bool> CreateOrUpdateIndexAsync(string indexName, CreateIndexFieldsCallback createIndexFieldsCallback, 
+            CreateIndexSuggesterCallback createSuggesterCallback, int creationDelay = 0)
         {
             try
             {
@@ -61,9 +70,9 @@ namespace BlackBarLabs.Search.Azure
                 if (default(Suggester) != suggester)
                     definition.Suggesters.Add(suggester);
 
-                var response = await searchClient.Indexes.CreateAsync(definition);
+                var response = await searchClient.Indexes.CreateOrUpdateAsync(definition);
                 await Task.Delay(creationDelay);
-                return (response.StatusCode == HttpStatusCode.Created || response.StatusCode == HttpStatusCode.OK);
+                return true;
             }
             catch (Exception ex)
             {
@@ -111,18 +120,18 @@ namespace BlackBarLabs.Search.Azure
                     definition.Suggesters.Add(suggester);
 
                 var response = searchClient.Indexes.Create(definition);
-                return (response.StatusCode == HttpStatusCode.Created || response.StatusCode == HttpStatusCode.OK);
+                return true;
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException($"Error creating index: {ex.Message}\r\n");
             }
         }
-
-        private static Microsoft.Azure.Search.Models.DataType GetEdmType(string type)
+        
+        private static Microsoft.Azure.Search.Models.DataType GetEdmType(Type type)
         {
             // Types of search fields must be in Entity Data Format.  https://msdn.microsoft.com/en-us/library/azure/dn946880.aspx
-            switch (type)
+            switch (type.FullName)
             {
                 case "System.String":
                     return DataType.String;
@@ -133,7 +142,6 @@ namespace BlackBarLabs.Search.Azure
                 default:
                     throw new ArgumentOutOfRangeException();
             }
-            return "";
         }
 
         public async Task<bool> DeleteIndexAsync(string indexName)
@@ -180,8 +188,8 @@ namespace BlackBarLabs.Search.Azure
                 {
                     var x = new object();
                     var actions =
-                        itemList.Select(item => IndexAction.Create(IndexActionType.MergeOrUpload, x));
-                    var batch = IndexBatch.Create(actions);
+                        itemList.Select(item => IndexAction.MergeOrUpload(x));
+                    var batch = IndexBatch.Upload(actions);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
                 }
@@ -203,7 +211,7 @@ namespace BlackBarLabs.Search.Azure
             try
             {
                 var response = await indexClient.Documents.GetAsync<TResult>(id);
-                var doc = convertFunc(response.Document);
+                var doc = convertFunc(response);
                 return doc;
             }
             catch (Exception ex)
@@ -224,8 +232,8 @@ namespace BlackBarLabs.Search.Azure
                 try
                 {
                     var actions =
-                        itemList.Select(item => IndexAction.Create(IndexActionType.Delete, item));
-                    var batch = IndexBatch.Create(actions);
+                        itemList.Select(item => IndexAction.Delete(item));
+                    var batch = IndexBatch.Upload(actions);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
                 }
@@ -243,7 +251,7 @@ namespace BlackBarLabs.Search.Azure
             string indexName, string searchText,
             List<string> facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
             Func<TResult, TResult> convertFunc,
-            Action<string, Dictionary<string, long>> facetFunc,
+            Action<string, Dictionary<string, long?>> facetFunc,
             Action<long?> count)
             where TResult : class, new()
         {
@@ -269,12 +277,12 @@ namespace BlackBarLabs.Search.Azure
             return await DoSearch(indexClient, searchText, facetFields, searchParameters, convertFunc, facetFunc, count.Invoke);
         }
 
-        private async Task<IEnumerable<TResult>> DoSearch<TResult>(SearchIndexClient indexClient, string searchText, List<string> facetFields, 
-            SearchParameters searchParameters, Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long>> facetFunc, Action<long?> count)
+        private async Task<IEnumerable<TResult>> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, List<string> facetFields, 
+            SearchParameters searchParameters, Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long?>> facetFunc, Action<long?> count)
              where TResult : class, new()
         {
             var response = await indexClient.Documents.SearchAsync<TResult>(searchText, searchParameters);
-            var items = response.Select(item => convertFunc(item.Document));
+            var items = response.Results.Select(item => convertFunc(item.Document));
             if (default(List<string>) != facetFields)
             {
                 foreach (var facet in response.Facets)
@@ -293,12 +301,12 @@ namespace BlackBarLabs.Search.Azure
             return items.Concat(continuationItems);
         }
 
-        private async Task<IEnumerable<TResult>> DoSearch<TResult>(SearchIndexClient indexClient, SearchContinuationToken continuationToken, List<string> facetFields,
-            Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long>> facetFunc, Action<long?> count)
+        private async Task<IEnumerable<TResult>> DoSearch<TResult>(ISearchIndexClient indexClient, SearchContinuationToken continuationToken, List<string> facetFields,
+            Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long?>> facetFunc, Action<long?> count)
              where TResult : class, new()
         {
             var response = await indexClient.Documents.ContinueSearchAsync<TResult>(continuationToken);
-            var items = response.Select(item => convertFunc(item.Document));
+            var items = response.Results.Select(item => convertFunc(item.Document));
             if (default(List<string>) != facetFields)
             {
                 foreach (var facet in response.Facets)
@@ -330,7 +338,7 @@ namespace BlackBarLabs.Search.Azure
             };
 
             var response = await indexClient.Documents.SuggestAsync<T>(searchText, suggestName, suggestParameters);
-            var suggestions = response.Select(item => convertFunc(item.Document));
+            var suggestions = response.Results.Select(item => convertFunc(item.Document));
             return suggestions;
         }
 
