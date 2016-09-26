@@ -119,17 +119,17 @@ namespace BlackBarLabs.Search.Azure
             }
         }
 
-        private static string GetEdmType(string type)
+        private static Microsoft.Azure.Search.Models.DataType GetEdmType(string type)
         {
             // Types of search fields must be in Entity Data Format.  https://msdn.microsoft.com/en-us/library/azure/dn946880.aspx
             switch (type)
             {
                 case "System.String":
-                    return "Edm.String";
+                    return DataType.String;
                 case "System.Double":
-                    return "Edm.Double";
+                    return DataType.Double;
                 case "System.Decimal":
-                    return "Edm.String";
+                    return DataType.Double;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
