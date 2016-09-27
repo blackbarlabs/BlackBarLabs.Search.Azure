@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Hyak.Common;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
+using Microsoft.Data.Edm.EdmToClrConversion;
 
 namespace BlackBarLabs.Search.Azure
 {
@@ -128,7 +129,7 @@ namespace BlackBarLabs.Search.Azure
             }
         }
         
-        private static Microsoft.Azure.Search.Models.DataType GetEdmType(Type type)
+        private static DataType GetEdmType(Type type)
         {
             // Types of search fields must be in Entity Data Format.  https://msdn.microsoft.com/en-us/library/azure/dn946880.aspx
             switch (type.FullName)
@@ -142,6 +143,15 @@ namespace BlackBarLabs.Search.Azure
                 default:
                     throw new ArgumentOutOfRangeException();
             }
+        }
+
+        public Type GenerateDynamicTypeFromSearchIndex(string searchIndexName)
+        {
+            var edmClrConverter = new EdmToClrConverter();
+            var index = this.searchClient.Indexes.Get(searchIndexName);
+
+            var type = typeof(string); // BlackBarLabs.Core.Reflection.ObjectBuilder.CompileResultType()
+            return type;
         }
 
         public async Task<bool> DeleteIndexAsync(string indexName)
@@ -186,9 +196,11 @@ namespace BlackBarLabs.Search.Azure
             {
                 try
                 {
-                    var x = new object();
                     var actions =
-                        itemList.Select(item => IndexAction.MergeOrUpload(x));
+                        itemList.Select(item =>
+                        {
+                            return IndexAction.MergeOrUpload(item);
+                        });
                     var batch = IndexBatch.Upload(actions);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
