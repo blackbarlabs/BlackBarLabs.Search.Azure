@@ -7,6 +7,8 @@ using Hyak.Common;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using Microsoft.Data.Edm.EdmToClrConversion;
+using BlackBarLabs.Web;
+using BlackBarLabs.Core.Collections;
 
 namespace BlackBarLabs.Search.Azure
 {
@@ -17,6 +19,27 @@ namespace BlackBarLabs.Search.Azure
         public AzureSearchEngine(SearchServiceClient searchClient)
         {
             this.searchClient = searchClient;
+        }
+
+        public async Task<Field> CreateFieldAsync(string indexName, string fieldName, Type type,
+            bool isKey, bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable)
+        {
+            var field = new Field()
+            {
+                Name = fieldName,
+                Type = GetEdmType(type),
+                IsKey = isKey,
+                IsSearchable = isSearchable,
+                IsFilterable = isFilterable,
+                IsSortable = isSortable,
+                IsFacetable = isFacetable,
+                IsRetrievable = isRetrievable
+            };
+
+            var index = await searchClient.Indexes.GetAsync(indexName);
+            index.Fields.AddIfNotExisting(field);
+            var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
+            return field;
         }
 
         public delegate void CreateIndexFieldsCallback(CreateFieldCallback createField);
@@ -145,13 +168,31 @@ namespace BlackBarLabs.Search.Azure
             }
         }
 
-        public Type GenerateDynamicTypeFromSearchIndex(string searchIndexName)
+        private static Type GetClrType(DataType type)
         {
-            var edmClrConverter = new EdmToClrConverter();
-            var index = this.searchClient.Indexes.Get(searchIndexName);
+            if (DataType.Boolean.Equals(type))
+                return typeof(bool);
+            if (DataType.DateTimeOffset.Equals(type))
+                return typeof(DateTimeOffset);
+            if (DataType.Double.Equals(type))
+                return typeof(double);
+            if (DataType.Int32.Equals(type))
+                return typeof(int);
+            if (DataType.Int64.Equals(type))
+                return typeof(long);
+            if (DataType.String.Equals(type))
+                return typeof(string);
+            throw new ArgumentOutOfRangeException();
+        }
 
-            var type = typeof(string); // BlackBarLabs.Core.Reflection.ObjectBuilder.CompileResultType()
-            return type;
+        public IDictionary<string, Type> FieldsFromSearchIndex(string searchIndexName)
+        {
+            var index = this.searchClient.Indexes.Get(searchIndexName);
+            var types = index.Fields
+                .Select(field => new KeyValuePair<string, Type>(
+                    field.Name, GetClrType(field.Type)))
+                .ToDictionary();
+            return types;
         }
 
         public async Task<bool> DeleteIndexAsync(string indexName)
@@ -180,8 +221,16 @@ namespace BlackBarLabs.Search.Azure
             return true;
         }
 
-        public async Task<bool> MergeOrUploadItemsAsync<T>(string indexName, List<T> itemList, Action<string> createIndex, int numberOfTimesToRetry = 3)
+        public async Task<bool> MergeOrUploadItemsAsync<T>(string indexName, IEnumerable<T> itemList, Action<string> createIndex, int numberOfTimesToRetry = 3)
             where T : class
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<bool> MergeOrUploadItemsToIndexAsync(string indexName,
+            IEnumerable<IDictionary<string, object>> itemList,
+            Action<string> createIndex,
+            int numberOfTimesToRetry = 3)
         {
             if (!searchClient.Indexes.Exists(indexName))
             {
@@ -192,16 +241,22 @@ namespace BlackBarLabs.Search.Azure
             if (default(SearchIndexClient) == indexClient)
                 throw new InvalidOperationException("Index does not exist: " + indexName);
 
+            var documents = itemList.Select(
+                item =>
+                {
+                    var doc = new Microsoft.Azure.Search.Models.Document();
+                    foreach(var itemKvp in item)
+                    {
+                        doc.Add(itemKvp.Key, itemKvp.Value);
+                    }
+                    return doc;
+                });
+
             while (numberOfTimesToRetry >= 0)
             {
                 try
                 {
-                    var actions =
-                        itemList.Select(item =>
-                        {
-                            return IndexAction.MergeOrUpload(item);
-                        });
-                    var batch = IndexBatch.Upload(actions);
+                    var batch = IndexBatch.Upload(documents);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
                 }
@@ -376,6 +431,16 @@ namespace BlackBarLabs.Search.Azure
                 numberOfTimesToRetry--;
             }
             throw new Exception("Indexing of items has exceeded maximum allowable attempts");
+        }
+
+        public async Task<bool> UpdateItemAsync(string indexName, IDictionary<string, object> item)
+        {
+            var indexClient = searchClient.Indexes.GetClient(indexName);
+            if (default(SearchIndexClient) == indexClient)
+                throw new InvalidOperationException("Index does not exist: " + indexName);
+
+            var itemList = item.ToEnumerable();
+            return await MergeOrUploadItemsToIndexAsync(indexName, itemList, null);
         }
     }
 }
