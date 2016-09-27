@@ -37,9 +37,26 @@ namespace BlackBarLabs.Search.Azure
             };
 
             var index = await searchClient.Indexes.GetAsync(indexName);
+            if (isKey)
+            {
+                var keyFields = index.Fields.Where(fld => fld.IsKey);
+                foreach(var fld in keyFields)
+                    index.Fields.Remove(fld);
+            }
+
             index.Fields.AddIfNotExisting(field);
-            var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
-            return field;
+            try
+            {
+                var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
+                return field;
+            } catch(Microsoft.Rest.Azure.CloudException clEx)
+            {
+                var indexNew = await searchClient.Indexes.GetAsync(indexName);
+                if(indexNew.ETag != index.ETag)
+                    return await CreateFieldAsync(indexName, fieldName, type,
+                        isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                throw clEx;
+            }
         }
 
         public delegate void CreateIndexFieldsCallback(CreateFieldCallback createField);
