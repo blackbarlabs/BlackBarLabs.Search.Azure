@@ -36,26 +36,43 @@ namespace BlackBarLabs.Search.Azure
                 IsRetrievable = isRetrievable
             };
 
-            var index = await searchClient.Indexes.GetAsync(indexName);
-            if (isKey)
-            {
-                var keyFields = index.Fields.Where(fld => fld.IsKey);
-                foreach(var fld in keyFields)
-                    index.Fields.Remove(fld);
-            }
-
-            index.Fields.AddIfNotExisting(field);
             try
             {
-                var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
-                return field;
-            } catch(Microsoft.Rest.Azure.CloudException clEx)
+                var index = await searchClient.Indexes.GetAsync(indexName);
+
+                if (isKey)
+                {
+                    var keyFields = index.Fields.Where(fld => fld.IsKey).ToArray();
+                    if (keyFields.Any())
+                        return default(Field);
+
+                    foreach(var fld in keyFields)
+                        index.Fields.Remove(fld);
+                }
+                index.Fields.AddIfNotExisting(field);
+
+                try
+                {
+                    var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
+                    return field;
+                } catch(Microsoft.Rest.Azure.CloudException clEx)
+                {
+                    var indexNew = await searchClient.Indexes.GetAsync(indexName);
+                    if(indexNew.ETag != index.ETag)
+                        return await CreateFieldAsync(indexName, fieldName, type,
+                            isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                    throw clEx;
+                }
+            }
+            catch (Exception ex)
             {
-                var indexNew = await searchClient.Indexes.GetAsync(indexName);
-                if(indexNew.ETag != index.ETag)
-                    return await CreateFieldAsync(indexName, fieldName, type,
-                        isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
-                throw clEx;
+                if (!searchClient.Indexes.Exists(indexName))
+                {
+                    var index = new Index(indexName, field.ToEnumerable().ToList());
+                    await searchClient.Indexes.CreateAsync(index);
+                    return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                }
+                throw;
             }
         }
 
@@ -204,12 +221,21 @@ namespace BlackBarLabs.Search.Azure
 
         public IDictionary<string, Type> FieldsFromSearchIndex(string searchIndexName)
         {
-            var index = this.searchClient.Indexes.Get(searchIndexName);
-            var types = index.Fields
-                .Select(field => new KeyValuePair<string, Type>(
-                    field.Name, GetClrType(field.Type)))
-                .ToDictionary();
-            return types;
+            try
+            {
+                var index = this.searchClient.Indexes.Get(searchIndexName);
+                var types = index.Fields
+                    .Select(field => new KeyValuePair<string, Type>(
+                        field.Name, GetClrType(field.Type)))
+                    .ToDictionary();
+                return types;
+            }
+            catch(Exception ex)
+            {
+                if (!searchClient.Indexes.Exists(searchIndexName))
+                    return new Dictionary<string, Type>();
+                throw;
+            }
         }
 
         public async Task<bool> DeleteIndexAsync(string indexName)
