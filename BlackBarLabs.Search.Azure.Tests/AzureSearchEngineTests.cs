@@ -188,7 +188,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                     await CreateIndexInternalAsync(idxName);
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
-                var facetFields = new List<string>() { "Brand" };
+                var facetFields = new string[] { "Brand" };
                 var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(indexName, "*", facetFields, false, 50, 0, null,
                     product => product, (facetKey, facets) =>
                     {
@@ -227,7 +227,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                     await CreateIndexInternalAsync(idxName);
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
-                var facetFields = new List<string>() { "Brand" };
+                var facetFields = new string[] { "Brand" };
                 var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(indexName, "*", facetFields, false, 50, 0, null,
                     product => product, (facetKey, facets) =>
                     {
@@ -328,7 +328,7 @@ namespace BlackBarLabs.Search.Azure.Tests
                     await CreateIndexInternalAsync(idxName);
                 });
                 await Task.Delay(5000);  // Azure Search says the indexing on their side could take some time.  Particularly on a shared search instance.
-                var facetFields = new List<string>() { "Brand" };
+                var facetFields = new string[] { "Brand" };
 
                 long? totalFoundCount = null;
                 var foundDocs = await azureSearchEngine.SearchDocumentsAsync<Product>(indexName, "*", facetFields, true, 5, 0, null,
