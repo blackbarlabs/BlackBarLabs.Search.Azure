@@ -193,6 +193,10 @@ namespace BlackBarLabs.Search.Azure
             {
                 case "System.String":
                     return DataType.String;
+                case "System.Int32":
+                    return DataType.Int32;
+                case "System.Int64":
+                    return DataType.Int64;
                 case "System.Double":
                     return DataType.Double;
                 case "System.Decimal":
@@ -360,7 +364,7 @@ namespace BlackBarLabs.Search.Azure
         public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(
             string indexName, string searchText,
             string[] facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
-            Func<TResult, TResult> convertFunc,
+            Func<IEnumerable<KeyValuePair<string, object>>[], TResult> searchResults,
             Action<string, Dictionary<string, long?>> facetFunc,
             Action<long?> count)
             where TResult : class, new()
@@ -384,31 +388,35 @@ namespace BlackBarLabs.Search.Azure
             if (null != skip)
                 searchParameters.Skip = skip;
 
-            return await DoSearch(indexClient, searchText, facetFields, searchParameters, convertFunc, facetFunc, count.Invoke);
+            return await DoSearch(indexClient, searchText, facetFields, searchParameters, searchResults, facetFunc, count.Invoke);
         }
 
         private async Task<IEnumerable<TResult>> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, string[] facetFields, 
-            SearchParameters searchParameters, Func<TResult, TResult> convertFunc, Action<string, Dictionary<string, long?>> facetFunc, Action<long?> count)
+            SearchParameters searchParameters, Func<IEnumerable<KeyValuePair<string, object>>[], TResult> searchResults, Action<string, 
+            Dictionary<string, long?>> facetFunc, Action<long?> count)
              where TResult : class, new()
         {
             var response = await indexClient.Documents.SearchAsync(searchText, searchParameters);
 
+            var results = response.Results.Select(result =>
+            {
+                return result.Document.Select(pair =>
+                {
+                    return pair;
+                });
+            }).ToArray();
+            searchResults(results);
 
-            var asdf = response.Results[0].Document.Values;
 
-
-            return null;
-
-            //var items = response.Results.Select(item => convertFunc(item.Document));
-            //if (default(string[]) != facetFields)
-            //{
-            //    foreach (var facet in response.Facets)
-            //    {
-            //        var facetValues = facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count);
-            //        facetFunc.Invoke(facet.Key, facetValues);
-            //    }
-            //}
-            //count.Invoke(response.Count);
+            if (default(string[]) != facetFields)
+            {
+                foreach (var facet in response.Facets)
+                {
+                    var facetValues = facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count);
+                    facetFunc.Invoke(facet.Key, facetValues);
+                }
+            }
+            count.Invoke(response.Count);
 
             //var continuationItems = new List<TResult>() as IEnumerable<TResult>;
             //if (null != response.ContinuationToken)
@@ -416,6 +424,9 @@ namespace BlackBarLabs.Search.Azure
             //    continuationItems = await DoSearch(indexClient, response.ContinuationToken, facetFields, convertFunc, facetFunc, count.Invoke);
             //}
             //return items.Concat(continuationItems);
+
+            return null;
+
         }
 
         private async Task<IEnumerable<TResult>> DoSearch<TResult>(ISearchIndexClient indexClient, SearchContinuationToken continuationToken, string[] facetFields,
