@@ -16,6 +16,13 @@ namespace BlackBarLabs.Search.Azure
     {
         private readonly SearchServiceClient searchClient;
 
+        public struct SearchResults
+        {
+            public IEnumerable<IEnumerable<KeyValuePair<string, object>>> Results;
+            public IEnumerable<Dictionary<string, long?>> Facets;
+            public long? Count;
+        }
+
         public AzureSearchEngine(SearchServiceClient searchClient)
         {
             this.searchClient = searchClient;
@@ -361,13 +368,10 @@ namespace BlackBarLabs.Search.Azure
             throw new Exception("Deletion of items has exceeded maximum allowable attempts");
         }
 
-        public async Task<IEnumerable<TResult>> SearchDocumentsAsync<TResult>(
+        public async Task<TResult> SearchDocumentsAsync<TResult>(
             string indexName, string searchText,
             string[] facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
-            Func<IEnumerable<KeyValuePair<string, object>>[], TResult> searchResults,
-            Action<string, Dictionary<string, long?>> facetFunc,
-            Action<long?> count)
-            where TResult : class, new()
+            Func<SearchResults, TResult> searchResults)
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
 
@@ -388,35 +392,26 @@ namespace BlackBarLabs.Search.Azure
             if (null != skip)
                 searchParameters.Skip = skip;
 
-            return await DoSearch(indexClient, searchText, facetFields, searchParameters, searchResults, facetFunc, count.Invoke);
+            return await DoSearch(indexClient, searchText, facetFields, searchParameters, searchResults);
         }
 
-        private async Task<IEnumerable<TResult>> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, string[] facetFields, 
-            SearchParameters searchParameters, Func<IEnumerable<KeyValuePair<string, object>>[], TResult> searchResults, Action<string, 
-            Dictionary<string, long?>> facetFunc, Action<long?> count)
-             where TResult : class, new()
+        private static async Task<TResult> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, string[] facetFields, 
+            SearchParameters searchParameters, Func<SearchResults, TResult> searchResults)
         {
             var response = await indexClient.Documents.SearchAsync(searchText, searchParameters);
 
-            var results = response.Results.Select(result =>
+            var sR = new SearchResults();
+            sR.Results = response.Results.Select(result =>
             {
-                return result.Document.Select(pair =>
-                {
-                    return pair;
-                });
-            }).ToArray();
-            searchResults(results);
-
+                return result.Document.Select(pair => pair);
+            });
 
             if (default(string[]) != facetFields)
             {
-                foreach (var facet in response.Facets)
-                {
-                    var facetValues = facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count);
-                    facetFunc.Invoke(facet.Key, facetValues);
-                }
+                sR.Facets = response.Facets.Select(facet => facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count));
             }
-            count.Invoke(response.Count);
+            sR.Count = response.Count;
+            return searchResults(sR);
 
             //var continuationItems = new List<TResult>() as IEnumerable<TResult>;
             //if (null != response.ContinuationToken)
@@ -424,9 +419,6 @@ namespace BlackBarLabs.Search.Azure
             //    continuationItems = await DoSearch(indexClient, response.ContinuationToken, facetFields, convertFunc, facetFunc, count.Invoke);
             //}
             //return items.Concat(continuationItems);
-
-            return null;
-
         }
 
         private async Task<IEnumerable<TResult>> DoSearch<TResult>(ISearchIndexClient indexClient, SearchContinuationToken continuationToken, string[] facetFields,
