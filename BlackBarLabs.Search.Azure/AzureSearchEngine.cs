@@ -406,7 +406,8 @@ namespace BlackBarLabs.Search.Azure
                 return result.Document.Select(pair => pair);
             });
 
-            if (default(string[]) != facetFields)
+            //if (default(string[]) != facetFields)
+            if (facetFields.Any())
             {
                 sR.Facets = response.Facets.Select(facet => facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count));
             }
