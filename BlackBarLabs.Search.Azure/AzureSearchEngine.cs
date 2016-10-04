@@ -19,7 +19,7 @@ namespace BlackBarLabs.Search.Azure
         public struct SearchResults
         {
             public IEnumerable<IEnumerable<KeyValuePair<string, object>>> Results;
-            public IEnumerable<Dictionary<string, long?>> Facets;
+            public IEnumerable<KeyValuePair<string, Dictionary<string, long?>>> Facets;
             public long? Count;
         }
 
@@ -406,10 +406,12 @@ namespace BlackBarLabs.Search.Azure
                 return result.Document.Select(pair => pair);
             });
 
-            //if (default(string[]) != facetFields)
             if (facetFields.Any())
             {
-                sR.Facets = response.Facets.Select(facet => facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count));
+                sR.Facets = response.Facets.Select(facet =>
+                {
+                    return new KeyValuePair<string, Dictionary<string, long?>>(facet.Key, facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count));
+                });
             }
             sR.Count = response.Count;
             return searchResults(sR);
