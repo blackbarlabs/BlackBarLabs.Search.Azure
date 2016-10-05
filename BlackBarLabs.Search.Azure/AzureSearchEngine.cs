@@ -406,7 +406,7 @@ namespace BlackBarLabs.Search.Azure
                 return result.Document.Select(pair => pair);
             });
 
-            if (facetFields.Any())
+            if (null != facetFields && facetFields.Any())
             {
                 sR.Facets = response.Facets.Select(facet =>
                 {
