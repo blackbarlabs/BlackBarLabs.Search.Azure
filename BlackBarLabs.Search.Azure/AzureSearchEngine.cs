@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using BlackBarLabs.Collections.Generic;
 using Hyak.Common;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
@@ -406,7 +407,7 @@ namespace BlackBarLabs.Search.Azure
                 return result.Document.Select(pair => pair);
             });
 
-            if (null != facetFields && facetFields.Any())
+            if (facetFields.NullToEmpty().Any())
             {
                 sR.Facets = response.Facets.Select(facet =>
                 {
