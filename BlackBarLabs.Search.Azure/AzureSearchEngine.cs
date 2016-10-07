@@ -47,6 +47,71 @@ namespace BlackBarLabs.Search.Azure
             try
             {
                 var index = await searchClient.Indexes.GetAsync(indexName);
+                var fieldsMatching = index.Fields.Where(f => String.Compare(f.Name, field.Name, true) == 0);
+                if (fieldsMatching.Any())
+                    return fieldsMatching.First();
+
+                if (isKey)
+                {
+                    var keyFields = index.Fields.Where(fld => fld.IsKey).ToArray();
+                    if (keyFields.Any())
+                        return default(Field);
+
+                    foreach (var fld in keyFields)
+                        index.Fields.Remove(fld);
+                }
+                index.Fields.AddIfNotExisting(field);
+
+                try
+                {
+                    var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
+                    return field;
+                }
+                catch (Microsoft.Rest.Azure.CloudException clEx)
+                {
+                    return await CreateFieldAsync(indexName, fieldName, type,
+                            isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                }
+            }
+            catch (Microsoft.Rest.Azure.CloudException ex)
+            {
+                if (!searchClient.Indexes.Exists(indexName))
+                {
+                    var index = new Index(indexName, field.ToEnumerable().ToList());
+                    try
+                    {
+                        await searchClient.Indexes.CreateAsync(index);
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                    return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                }
+                if(ex.Response.StatusCode == HttpStatusCode.NotFound)
+                    return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                throw ex;
+            }
+        }
+
+        public async Task<Field> CreateFieldAsync2(string indexName, string fieldName, Type type,
+            bool isKey, bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable)
+        {
+            var field = new Field()
+            {
+                Name = fieldName,
+                Type = GetEdmType(type),
+                IsKey = isKey,
+                IsSearchable = isSearchable,
+                IsFilterable = isFilterable,
+                IsSortable = isSortable,
+                IsFacetable = isFacetable,
+                IsRetrievable = isRetrievable
+            };
+
+            try
+            {
+                var index = await searchClient.Indexes.GetAsync(indexName);
 
                 if (isKey)
                 {
@@ -77,7 +142,13 @@ namespace BlackBarLabs.Search.Azure
                 if (!searchClient.Indexes.Exists(indexName))
                 {
                     var index = new Index(indexName, field.ToEnumerable().ToList());
-                    await searchClient.Indexes.CreateAsync(index);
+                    try
+                    {
+                        await searchClient.Indexes.CreateAsync(index);
+                    } catch(Exception)
+                    {
+
+                    }
                     return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
                 }
                 throw;
