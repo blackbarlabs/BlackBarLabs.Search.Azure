@@ -84,7 +84,7 @@ namespace BlackBarLabs.Search.Azure
                     }
                     catch (Exception)
                     {
-
+                        System.Threading.Thread.Sleep(500);
                     }
                     return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
                 }
@@ -276,10 +276,14 @@ namespace BlackBarLabs.Search.Azure
                     return DataType.Int32;
                 case "System.Int64":
                     return DataType.Int64;
+                case "System.Single":
+                    return DataType.Double;
                 case "System.Double":
                     return DataType.Double;
                 case "System.Decimal":
                     return DataType.Double;
+                case "System.Boolean":
+                    return DataType.Boolean;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
