@@ -392,7 +392,8 @@ namespace BlackBarLabs.Search.Azure
                 }
                 catch (Exception ex)
                 {
-                    if ((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
+                    if ((!typeof(IndexBatchException).IsInstanceOfType(ex)) && 
+                        (!typeof(CloudException).IsInstanceOfType(ex)))
                         throw;
                 }
                 numberOfTimesToRetry--;

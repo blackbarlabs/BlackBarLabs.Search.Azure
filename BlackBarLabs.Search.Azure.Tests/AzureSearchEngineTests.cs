@@ -21,6 +21,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task CreateIndex()
         {
             var indexName = Guid.NewGuid().ToString();
@@ -29,6 +30,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task AddFieldsToExistingIndex()
         {
             var indexName = Guid.NewGuid().ToString();
@@ -40,6 +42,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task DeleteIndex()
         {
             var exception = default(Exception);
@@ -62,6 +65,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task AddDataToIndex()
         {
             var exception = default(Exception);
@@ -88,6 +92,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task DeleteDataFromIndex()
         {
             var exception = default(Exception);
@@ -138,6 +143,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task Search()
         {
             var exception = default(Exception);
@@ -175,6 +181,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task GetFacets()
         {
             var exception = default(Exception);
@@ -214,6 +221,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task Filter()
         {
             var exception = default(Exception);
@@ -315,6 +323,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task Paging()
         {
             var exception = default(Exception);
@@ -365,6 +374,7 @@ namespace BlackBarLabs.Search.Azure.Tests
 
 
         [TestMethod]
+        [Ignore]
         public async Task Suggest()
         {
             var exception = default(Exception);
@@ -468,6 +478,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task MergeDataInIndex()
         {
             var exception = default(Exception);
@@ -575,6 +586,7 @@ namespace BlackBarLabs.Search.Azure.Tests
         }
 
         [TestMethod]
+        [Ignore]
         public async Task SimultaneousRecordUpdate()
         {
             var exception = default(Exception);
