@@ -418,8 +418,7 @@ namespace BlackBarLabs.Search.Azure
             }
         }
 
-        public async Task<bool> DeleteItemsAsync<T>(string indexName, List<T> itemList, int numberOfTimesToRetry = 3)
-            where T : class
+        public async Task<bool> DeleteItemsAsync(string indexName, string keyName, IEnumerable<string> keyValues, int numberOfTimesToRetry = 3)
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
             if (default(SearchIndexClient) == indexClient)
@@ -429,9 +428,7 @@ namespace BlackBarLabs.Search.Azure
             {
                 try
                 {
-                    var actions =
-                        itemList.Select(item => IndexAction.Delete(item));
-                    var batch = IndexBatch.Upload(actions);
+                    var batch = IndexBatch.Delete(keyName, keyValues);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
                 }
