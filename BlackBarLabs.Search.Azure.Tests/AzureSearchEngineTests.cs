@@ -108,7 +108,7 @@ namespace BlackBarLabs.Search.Azure.Tests
 
                 await Task.Delay(5000); // Per Microsoft, there could be a delay in modifying the index.  Wait...
                 
-                await azureSearchEngine.DeleteItemsAsync<Product>(indexName, products);
+                //await azureSearchEngine.DeleteItemsAsync(indexName, products);
 
                 await Task.Delay(5000); // Per Microsoft, there could be a delay in modifying the index.  Wait...
 
