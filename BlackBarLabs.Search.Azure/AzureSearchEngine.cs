@@ -472,23 +472,29 @@ namespace BlackBarLabs.Search.Azure
         private static async Task<TResult> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, string[] facetFields, 
             SearchParameters searchParameters, Func<SearchResults, TResult> searchResults)
         {
-            var response = await indexClient.Documents.SearchAsync(searchText, searchParameters);
-
-            var sR = new SearchResults();
-            sR.Results = response.Results.Select(result =>
+            try
             {
-                return result.Document.Select(pair => pair);
-            });
-
-            if (facetFields.NullToEmpty().Any())
-            {
-                sR.Facets = response.Facets.Select(facet =>
+                var response = await indexClient.Documents.SearchAsync(searchText, searchParameters);
+                var sR = new SearchResults();
+                sR.Results = response.Results.Select(result =>
                 {
-                    return new KeyValuePair<string, Dictionary<string, long?>>(facet.Key, facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count));
+                    return result.Document.Select(pair => pair);
                 });
+
+                if (facetFields.NullToEmpty().Any())
+                {
+                    sR.Facets = response.Facets.Select(facet =>
+                    {
+                        return new KeyValuePair<string, Dictionary<string, long?>>(facet.Key, facet.Value.ToDictionary(item => item.Value.ToString(), item => item.Count));
+                    });
+                }
+                sR.Count = response.Count;
+                return searchResults(sR);
+            } catch(Microsoft.Rest.Azure.CloudException clEx)
+            {
+                throw clEx;
             }
-            sR.Count = response.Count;
-            return searchResults(sR);
+            
 
             //var continuationItems = new List<TResult>() as IEnumerable<TResult>;
             //if (null != response.ContinuationToken)
