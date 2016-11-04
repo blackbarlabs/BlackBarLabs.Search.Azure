@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using BlackBarLabs.Collections.Generic;
-using Hyak.Common;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using Microsoft.Data.Edm.EdmToClrConversion;
@@ -393,7 +392,7 @@ namespace BlackBarLabs.Search.Azure
                 catch (Exception ex)
                 {
                     if ((!typeof(IndexBatchException).IsInstanceOfType(ex)) && 
-                        (!typeof(CloudException).IsInstanceOfType(ex)))
+                        (!typeof(Microsoft.Rest.Azure.CloudException).IsInstanceOfType(ex)))
                         throw;
                 }
                 numberOfTimesToRetry--;
@@ -434,7 +433,8 @@ namespace BlackBarLabs.Search.Azure
                 }
                 catch (Exception ex)
                 {
-                    if ((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
+                    if ((typeof(IndexBatchException) != ex.GetType()) &&
+                        (typeof(Microsoft.Rest.Azure.CloudException) != ex.GetType()))
                         throw;
                 }
                 numberOfTimesToRetry--;
@@ -561,7 +561,8 @@ namespace BlackBarLabs.Search.Azure
                 }
                 catch (Exception ex)
                 {
-                    if ((typeof(IndexBatchException) != ex.GetType()) && (typeof(CloudException) != ex.GetType()))
+                    if ((typeof(IndexBatchException) != ex.GetType()) &&
+                        (typeof(Microsoft.Rest.Azure.CloudException) != ex.GetType()))
                         throw;
                 }
                 numberOfTimesToRetry--;
