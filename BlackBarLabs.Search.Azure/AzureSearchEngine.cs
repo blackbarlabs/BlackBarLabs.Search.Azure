@@ -359,7 +359,7 @@ namespace BlackBarLabs.Search.Azure
         public async Task<bool> MergeOrUploadItemsToIndexAsync(string indexName,
             IEnumerable<IDictionary<string, object>> itemList,
             Action<string> createIndex,
-            int numberOfTimesToRetry = 3)
+            int numberOfTimesToRetry = 10)
         {
             if (!searchClient.Indexes.Exists(indexName))
             {
@@ -381,6 +381,7 @@ namespace BlackBarLabs.Search.Azure
                     return doc;
                 });
 
+            var exTooManyTimes = default(Exception);
             while (numberOfTimesToRetry >= 0)
             {
                 try
@@ -394,10 +395,11 @@ namespace BlackBarLabs.Search.Azure
                     if ((!typeof(IndexBatchException).IsInstanceOfType(ex)) && 
                         (!typeof(Microsoft.Rest.Azure.CloudException).IsInstanceOfType(ex)))
                         throw;
+                    exTooManyTimes = ex;
                 }
                 numberOfTimesToRetry--;
             }
-            throw new Exception("Indexing of items has exceeded maximum allowable attempts");
+            throw new Exception("Indexing of items has exceeded maximum allowable attempts", exTooManyTimes);
         }
 
         public async Task<TResult> GetDocumentById<TResult>(string indexName, string id, Func<TResult, TResult> convertFunc)
