@@ -59,7 +59,8 @@ namespace BlackBarLabs.Search.Azure
                     foreach (var fld in keyFields)
                         index.Fields.Remove(fld);
                 }
-                index.Fields.AddIfNotExisting(field);
+                if(!index.Fields.Contains(field))
+                    index.Fields.Add(field);
 
                 try
                 {
@@ -90,67 +91,6 @@ namespace BlackBarLabs.Search.Azure
                 if(ex.Response.StatusCode == HttpStatusCode.NotFound)
                     return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
                 throw ex;
-            }
-        }
-
-        public async Task<Field> CreateFieldAsync2(string indexName, string fieldName, Type type,
-            bool isKey, bool isSearchable, bool isFilterable, bool isSortable, bool isFacetable, bool isRetrievable)
-        {
-            var field = new Field()
-            {
-                Name = fieldName,
-                Type = GetEdmType(type),
-                IsKey = isKey,
-                IsSearchable = isSearchable,
-                IsFilterable = isFilterable,
-                IsSortable = isSortable,
-                IsFacetable = isFacetable,
-                IsRetrievable = isRetrievable
-            };
-
-            try
-            {
-                var index = await searchClient.Indexes.GetAsync(indexName);
-
-                if (isKey)
-                {
-                    var keyFields = index.Fields.Where(fld => fld.IsKey).ToArray();
-                    if (keyFields.Any())
-                        return default(Field);
-
-                    foreach(var fld in keyFields)
-                        index.Fields.Remove(fld);
-                }
-                index.Fields.AddIfNotExisting(field);
-
-                try
-                {
-                    var response = await searchClient.Indexes.CreateOrUpdateAsync(index);
-                    return field;
-                } catch(Microsoft.Rest.Azure.CloudException clEx)
-                {
-                    var indexNew = await searchClient.Indexes.GetAsync(indexName);
-                    if(indexNew.ETag != index.ETag)
-                        return await CreateFieldAsync(indexName, fieldName, type,
-                            isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
-                    throw clEx;
-                }
-            }
-            catch (Exception ex)
-            {
-                if (!searchClient.Indexes.Exists(indexName))
-                {
-                    var index = new Index(indexName, field.ToEnumerable().ToList());
-                    try
-                    {
-                        await searchClient.Indexes.CreateAsync(index);
-                    } catch(Exception)
-                    {
-
-                    }
-                    return await CreateFieldAsync(indexName, fieldName, type, isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
-                }
-                throw;
             }
         }
 
