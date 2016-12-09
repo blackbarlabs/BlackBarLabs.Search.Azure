@@ -295,53 +295,7 @@ namespace BlackBarLabs.Search.Azure
         {
             throw new NotImplementedException();
         }
-
-        public async Task<bool> MergeOrUploadItemsToIndexAsync(string indexName,
-            IEnumerable<IDictionary<string, object>> itemList,
-            Action<string> createIndex,
-            int numberOfTimesToRetry = 10)
-        {
-            if (!searchClient.Indexes.Exists(indexName))
-            {
-                createIndex.Invoke(indexName);
-            }
-
-            var indexClient = searchClient.Indexes.GetClient(indexName);
-            if (default(SearchIndexClient) == indexClient)
-                throw new InvalidOperationException("Index does not exist: " + indexName);
-
-            var documents = itemList.Select(
-                item =>
-                {
-                    var doc = new Microsoft.Azure.Search.Models.Document();
-                    foreach(var itemKvp in item)
-                    {
-                        doc.Add(itemKvp.Key, itemKvp.Value);
-                    }
-                    return doc;
-                });
-
-            var exTooManyTimes = default(Exception);
-            while (numberOfTimesToRetry >= 0)
-            {
-                try
-                {
-                    var batch = IndexBatch.Upload(documents);
-                    await indexClient.Documents.IndexAsync(batch);
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    if ((!typeof(IndexBatchException).IsInstanceOfType(ex)) && 
-                        (!typeof(Microsoft.Rest.Azure.CloudException).IsInstanceOfType(ex)))
-                        throw;
-                    exTooManyTimes = ex;
-                }
-                numberOfTimesToRetry--;
-            }
-            throw new Exception("Indexing of items has exceeded maximum allowable attempts", exTooManyTimes);
-        }
-
+        
         public async Task<TResult> GetDocumentById<TResult>(string indexName, string id, Func<TResult, TResult> convertFunc)
             where TResult : class, new()
         {
@@ -518,8 +472,34 @@ namespace BlackBarLabs.Search.Azure
             if (default(SearchIndexClient) == indexClient)
                 throw new InvalidOperationException("Index does not exist: " + indexName);
 
-            var itemList = item.ToEnumerable();
-            return await MergeOrUploadItemsToIndexAsync(indexName, itemList, null);
+            var doc = new Microsoft.Azure.Search.Models.Document();
+            foreach (var itemKvp in item)
+            {
+                doc.Add(itemKvp.Key, itemKvp.Value);
+            }
+
+            var exTooManyTimes = default(Exception);
+            var numberOfTimesToRetry = 10;
+            while (true)
+            {
+                try
+                {
+                    var batch = IndexBatch.Upload(doc.ToEnumerable());
+                    await indexClient.Documents.IndexAsync(batch);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    if (numberOfTimesToRetry < 0)
+                        throw;
+
+                    if ((!typeof(IndexBatchException).IsInstanceOfType(ex)) &&
+                        (!typeof(Microsoft.Rest.Azure.CloudException).IsInstanceOfType(ex)))
+                        throw;
+                    exTooManyTimes = ex;
+                }
+                numberOfTimesToRetry--;
+            }
         }
     }
 }
