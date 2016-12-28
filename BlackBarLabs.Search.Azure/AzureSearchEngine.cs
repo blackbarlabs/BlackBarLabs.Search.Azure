@@ -69,8 +69,13 @@ namespace BlackBarLabs.Search.Azure
                 }
                 catch (Microsoft.Rest.Azure.CloudException clEx)
                 {
-                    return await CreateFieldAsync(indexName, fieldName, type,
+                    if (HttpStatusCode.Conflict == clEx.Response.StatusCode ||
+                       HttpStatusCode.BadRequest == clEx.Response.StatusCode)
+                    {
+                        return await CreateFieldAsync(indexName, fieldName, type,
                             isKey, isSearchable, isFilterable, isSortable, isFacetable, isRetrievable);
+                    }
+                    throw;
                 }
             }
             catch (Microsoft.Rest.Azure.CloudException ex)
@@ -319,11 +324,15 @@ namespace BlackBarLabs.Search.Azure
             if (default(SearchIndexClient) == indexClient)
                 throw new InvalidOperationException("Index does not exist: " + indexName);
 
+            var keyValuesArray = keyValues.ToArray();
+            if (keyValuesArray.Length <= 0)
+                return true;
+
             while (numberOfTimesToRetry >= 0)
             {
                 try
                 {
-                    var batch = IndexBatch.Delete(keyName, keyValues);
+                    var batch = IndexBatch.Delete(keyName, keyValuesArray);
                     await indexClient.Documents.IndexAsync(batch);
                     return true;
                 }
