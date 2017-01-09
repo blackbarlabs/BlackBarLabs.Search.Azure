@@ -8,7 +8,8 @@ using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using Microsoft.Data.Edm.EdmToClrConversion;
 using BlackBarLabs.Web;
-using BlackBarLabs.Core.Collections;
+using BlackBarLabs.Linq;
+using BlackBarLabs.Extensions;
 
 namespace BlackBarLabs.Search.Azure
 {
