@@ -351,7 +351,8 @@ namespace BlackBarLabs.Search.Azure
         public async Task<TResult> SearchDocumentsAsync<TResult>(
             string indexName, string searchText,
             string[] facetFields, bool? includeTotalResultCount, int? top, int? skip, string filter,
-            Func<SearchResults, TResult> searchResults)
+            Func<SearchResults, TResult> searchResults,
+            Func<string, TResult> onFailure)
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
 
@@ -372,11 +373,13 @@ namespace BlackBarLabs.Search.Azure
             if (null != skip)
                 searchParameters.Skip = skip;
 
-            return await DoSearch(indexClient, searchText, facetFields, searchParameters, searchResults);
+            return await DoSearch(indexClient, searchText, facetFields, searchParameters, searchResults, onFailure);
         }
 
         private static async Task<TResult> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, string[] facetFields, 
-            SearchParameters searchParameters, Func<SearchResults, TResult> searchResults)
+                SearchParameters searchParameters,
+            Func<SearchResults, TResult> searchResults,
+            Func<string, TResult> onFailure)
         {
             try
             {
@@ -398,10 +401,15 @@ namespace BlackBarLabs.Search.Azure
                 return searchResults(sR);
             } catch(Microsoft.Rest.Azure.CloudException clEx)
             {
-                throw clEx;
+                if(clEx.Response.StatusCode == HttpStatusCode.BadRequest &&
+                   clEx.Body.Message.Contains("Only filterable fields can be used in filter expressions"))
+                {
+                    // This is a property that didn't get marked filterable.
+                    // However, this is probably not something we should add to the TResult options
+                }
+                return onFailure(clEx.Message);
             }
             
-
             //var continuationItems = new List<TResult>() as IEnumerable<TResult>;
             //if (null != response.ContinuationToken)
             //{
