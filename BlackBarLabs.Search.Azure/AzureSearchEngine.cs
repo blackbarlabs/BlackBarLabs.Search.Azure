@@ -55,13 +55,20 @@ namespace BlackBarLabs.Search.Azure
                 {
                     var keyFields = index.Fields.Where(fld => fld.IsKey).ToArray();
                     if (keyFields.Any())
-                        return default(Field);
-
-                    foreach (var fld in keyFields)
-                        index.Fields.Remove(fld);
+                    {
+                        var keyField = keyFields.First();
+                        keyField.Name = fieldName;
+                    } else
+                    {
+                        if (!index.Fields.Contains(field))
+                            index.Fields.Add(field);
+                    }
                 }
-                if(!index.Fields.Contains(field))
-                    index.Fields.Add(field);
+                else
+                {
+                    if (!index.Fields.Contains(field))
+                        index.Fields.Add(field);
+                }
 
                 try
                 {
@@ -486,7 +493,8 @@ namespace BlackBarLabs.Search.Azure
 
         public async Task<TResult> UpdateItemAsync<TResult>(string indexName, IDictionary<string, object> item,
             Func<TResult> onSuccess,
-            Func<TResult> onInvalidPropertyValue,
+            Func<string, TResult> onMissingField,
+            Func<string, TResult> onInvalidPropertyValue,
             Func<Exception, TResult> onFailure)
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
@@ -499,26 +507,33 @@ namespace BlackBarLabs.Search.Azure
                 doc.Add(itemKvp.Key, itemKvp.Value);
             }
             
-                try
-                {
+            try
+            {
                     var batch = IndexBatch.Upload(doc.ToEnumerable());
                     await indexClient.Documents.IndexAsync(batch);
                     return onSuccess();
-                }
-                catch (IndexBatchException ex)
+            }
+            catch (IndexBatchException ex)
+            {
+                return onFailure(ex);
+            }
+            catch (Microsoft.Rest.Azure.CloudException ex)
+            {
+                if (ex.Response.StatusCode == HttpStatusCode.BadRequest)
                 {
-                    return onFailure(ex);
+                    var match = System.Text.RegularExpressions.Regex.Match(ex.Response.Content,
+                            "The property '(\\w+)' does not exist on type");
+                    if (match.Success && match.Groups.Count >= 2)
+                        return onMissingField(match.Groups[1].Value);
+
+                    return onInvalidPropertyValue(null);
                 }
-                catch (Microsoft.Rest.Azure.CloudException ex)
-                {
-                    if(ex.Response.StatusCode == HttpStatusCode.BadRequest)
-                        return onInvalidPropertyValue();
-                    return onFailure(ex);
-                }
-                catch (Exception ex)
-                {
-                    return onFailure(ex);
-                }
+                return onFailure(ex);
+            }
+            catch (Exception ex)
+            {
+                return onFailure(ex);
+            }
         }
     }
 }
