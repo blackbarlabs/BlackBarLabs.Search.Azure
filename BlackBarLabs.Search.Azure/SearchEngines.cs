@@ -29,10 +29,18 @@ namespace BlackBarLabs.Search.Azure
                 lock (AzureSearchEngineLock)
                     if (azureSearchEngine == null)
                     {
-                        var serviceName = System.Configuration.ConfigurationManager.AppSettings[azureSearchServiceName];
-                        var serviceApiKey = System.Configuration.ConfigurationManager.AppSettings[azureSearchServiceApiKey];
-                        searchClient = new SearchServiceClient(serviceName, new SearchCredentials(serviceApiKey));
-                        azureSearchEngine = new AzureSearchEngine(searchClient);
+                        azureSearchEngine = EastFive.Web.Configuration.Settings.GetString(azureSearchServiceName,
+                            (serviceName) =>
+                            {
+                                return EastFive.Web.Configuration.Settings.GetString(azureSearchServiceApiKey,
+                                    (serviceApiKey) =>
+                                    {
+                                        searchClient = new SearchServiceClient(serviceName, new SearchCredentials(serviceApiKey));
+                                        return new AzureSearchEngine(searchClient);
+                                    },
+                                    (why) => { throw new Exception(why); });
+                            },
+                            (why) => { throw new Exception(why); });
                     }
 
                 return azureSearchEngine;
