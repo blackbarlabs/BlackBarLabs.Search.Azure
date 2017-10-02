@@ -271,6 +271,7 @@ namespace BlackBarLabs.Search.Azure
             }
             catch(Exception ex)
             {
+                var exceptionType = ex.GetType();
                 if (!searchClient.Indexes.Exists(searchIndexName))
                     return new Dictionary<string, Type>();
                 throw;
