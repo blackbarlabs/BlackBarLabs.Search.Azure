@@ -380,23 +380,35 @@ namespace BlackBarLabs.Search.Azure
 
             if (null != skip)
                 searchParameters.Skip = skip;
-
+            
             return await DoSearch(indexClient, searchText, facetFields, searchParameters, searchResults, onFailure);
+        }
+
+        private static async Task<IEnumerable<IEnumerable<KeyValuePair<string, object>>>> GetAllResultsAsync(
+            ISearchIndexClient indexClient, DocumentSearchResult response)
+        {
+            var results = response.Results.Select(
+                result => result.Document.Select(pair => pair));
+            if (default(SearchContinuationToken) == response.ContinuationToken)
+                return results;
+
+            var next = await indexClient.Documents.ContinueSearchAsync(response.ContinuationToken);
+            return results.Concat(await GetAllResultsAsync(indexClient, next));
         }
 
         private static async Task<TResult> DoSearch<TResult>(ISearchIndexClient indexClient, string searchText, string[] facetFields, 
                 SearchParameters searchParameters,
             Func<SearchResults, TResult> searchResults,
-            Func<string, TResult> onFailure)
+            Func<string, TResult> onFailure,
+            SearchContinuationToken continuationToken = default(SearchContinuationToken))
         {
             try
             {
-                var response = await indexClient.Documents.SearchAsync(searchText, searchParameters);
+                //searchParameters.
+                var response = await indexClient.Documents.SearchAsync(searchText,
+                    searchParameters);
                 var sR = new SearchResults();
-                sR.Results = response.Results.Select(result =>
-                {
-                    return result.Document.Select(pair => pair);
-                });
+                sR.Results = await GetAllResultsAsync(indexClient, response);
 
                 if (facetFields.NullToEmpty().Any())
                 {
