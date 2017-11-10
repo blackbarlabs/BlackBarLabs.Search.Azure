@@ -90,7 +90,7 @@ namespace BlackBarLabs.Search.Azure
             {
                 if (!searchClient.Indexes.Exists(indexName))
                 {
-                    var index = new Index(indexName, field.ToEnumerable().ToList());
+                    var index = new Index(indexName, field.AsEnumerable().ToList());
                     try
                     {
                         await searchClient.Indexes.CreateAsync(index);
@@ -522,7 +522,7 @@ namespace BlackBarLabs.Search.Azure
             
             try
             {
-                    var batch = IndexBatch.Upload(doc.ToEnumerable());
+                    var batch = IndexBatch.Upload(doc.AsEnumerable());
                     await indexClient.Documents.IndexAsync(batch);
                     return onSuccess();
             }
