@@ -10,6 +10,7 @@ using Microsoft.Data.Edm.EdmToClrConversion;
 using BlackBarLabs.Web;
 using BlackBarLabs.Linq;
 using BlackBarLabs.Extensions;
+using EastFive.Collections.Generic;
 
 namespace BlackBarLabs.Search.Azure
 {
