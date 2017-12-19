@@ -11,6 +11,7 @@ using BlackBarLabs.Web;
 using BlackBarLabs.Linq;
 using BlackBarLabs.Extensions;
 using EastFive.Collections.Generic;
+using EastFive.Linq;
 
 namespace BlackBarLabs.Search.Azure
 {
