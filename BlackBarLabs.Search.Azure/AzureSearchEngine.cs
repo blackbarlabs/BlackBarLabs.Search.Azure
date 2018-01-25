@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using BlackBarLabs.Collections.Generic;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using Microsoft.Data.Edm.EdmToClrConversion;
 using BlackBarLabs.Web;
-using BlackBarLabs.Linq;
 using BlackBarLabs.Extensions;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
@@ -312,20 +310,21 @@ namespace BlackBarLabs.Search.Azure
             throw new NotImplementedException();
         }
         
-        public async Task<TResult> GetDocumentById<TResult>(string indexName, string id, Func<TResult, TResult> convertFunc)
-            where TResult : class, new()
+        public async Task<TResult> GetDocumentById<TDocument, TResult>(string indexName, string id,
+            Func<TDocument, TResult> onFound,
+            Func<TResult> onNotFound)
+            where TDocument : class, new()
         {
             var indexClient = searchClient.Indexes.GetClient(indexName);
 
             try
             {
-                var response = await indexClient.Documents.GetAsync<TResult>(id);
-                var doc = convertFunc(response);
-                return doc;
+                var response = await indexClient.Documents.GetAsync<TDocument>(id);
+                return onFound(response);
             }
             catch (Exception ex)
             {
-                return null;
+                return onNotFound();
             }
         }
 
