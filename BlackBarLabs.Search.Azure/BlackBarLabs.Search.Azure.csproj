@@ -98,11 +98,11 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\BlackBarLabs.Core\EastFive.Core.csproj">
+    <ProjectReference Include="$(SolutionDir)\BlackBarLabs.Core\EastFive.Core.csproj">
       <Project>{73088f1b-3aca-476b-aa45-b7d6660f1c73}</Project>
       <Name>EastFive.Core</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\BlackBarLabs.Web\BlackBarLabs.Web.csproj">
+    <ProjectReference Include="$(SolutionDir)\BlackBarLabs.Web\BlackBarLabs.Web.csproj">
       <Project>{5BB52391-2704-44C0-BC8A-DBBE31498814}</Project>
       <Name>BlackBarLabs.Web</Name>
     </ProjectReference>
