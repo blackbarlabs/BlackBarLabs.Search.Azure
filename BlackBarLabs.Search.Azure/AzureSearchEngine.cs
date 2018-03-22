@@ -540,7 +540,7 @@ namespace BlackBarLabs.Search.Azure
                     if (match.Success && match.Groups.Count >= 2)
                         return onMissingField(match.Groups[1].Value);
 
-                    return onInvalidPropertyValue(null);
+                    //return onInvalidPropertyValue(null);
                 }
                 return onFailure(ex);
             }
