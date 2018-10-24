@@ -102,6 +102,10 @@
       <Project>{73088f1b-3aca-476b-aa45-b7d6660f1c73}</Project>
       <Name>EastFive.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\BlackBarLabs.Persistence.Azure\BlackBarLabs.Persistence.Azure.csproj">
+      <Project>{a228d9d3-91c9-48cb-9498-8e7b39f10ffe}</Project>
+      <Name>BlackBarLabs.Persistence.Azure</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\BlackBarLabs.Web\BlackBarLabs.Web.csproj">
       <Project>{5BB52391-2704-44C0-BC8A-DBBE31498814}</Project>
       <Name>BlackBarLabs.Web</Name>
