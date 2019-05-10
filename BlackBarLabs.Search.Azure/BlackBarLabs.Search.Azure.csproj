@@ -109,7 +109,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\BlackBarLabs.Core\EastFive.Core.csproj">
-      <Project>{73088f1b-3aca-476b-aa45-b7d6660f1c73}</Project>
+      <Project>{aec927ef-6aae-4533-bbf6-539643684002}</Project>
       <Name>EastFive.Core</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\BlackBarLabs.Persistence.Azure\BlackBarLabs.Persistence.Azure.csproj">
